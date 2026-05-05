@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SERPENTINE — A snake-like game coming to web and mobile. Join the waitlist for early access.">
+  <meta property="og:title" content="SERPENTINE — The Snake Game, Evolved">
+  <meta property="og:description" content="Browser-native snake game for web and mobile. No installs. Pure instinct.">
+  <meta property="og:type" content="website">
+  <title>SERPENTINE — The Snake Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <nav class="nav-container" aria-label="Main navigation">
+      <div class="nav-logo">
+        <span class="logo-bracket">[</span>SERPENTINE<span class="logo-bracket">]</span>
+      </div>
+      <ul class="nav-links" role="list">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#cta">Early Access</a></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+
+    <section id="hero" class="hero" aria-label="Hero section">
+      <div class="hero-content">
+        <p class="hero-eyebrow">// INCOMING TRANSMISSION</p>
+        <h1 class="hero-title">SERPENTINE</h1>
+        <p class="hero-tagline">The snake game, <span class="accent">evolved.</span></p>
+        <p class="hero-sub">Web &amp; Mobile &mdash; No installs. Pure instinct.</p>
+        <a href="#cta" class="btn btn--primary">Get Early Access</a>
+      </div>
+      <div class="hero-canvas-wrapper" aria-hidden="true">
+        <canvas id="snake-canvas"></canvas>
+      </div>
+    </section>
+
+    <section id="features" class="features" aria-label="Features">
+      <div class="container">
+        <h2 class="section-title">WHY SERPENTINE</h2>
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">&#9632;</div>
+            <h3>Play Anywhere</h3>
+            <p>Browser-native. Works on Chrome, Safari, and Firefox &mdash; desktop and mobile.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">&#9650;</div>
+            <h3>Touch Controls</h3>
+            <p>Swipe gestures built from day one, not bolted on after the fact.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">&#9670;</div>
+            <h3>Pixel Perfect</h3>
+            <p>Classic arcade feel with crisp rendering on any screen density.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">&#9733;</div>
+            <h3>Leaderboards</h3>
+            <p>Global and friend rankings. Climb. Compete. Dominate.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="cta" class="cta-section" aria-label="Early access signup">
+      <div class="container">
+        <p class="cta-label">// LAUNCH COUNTDOWN</p>
+        <div class="countdown" aria-live="polite" aria-label="Time until launch">
+          <div class="countdown-unit">
+            <span class="countdown-number" id="cd-days">00</span>
+            <span class="countdown-label">DAYS</span>
+          </div>
+          <span class="countdown-sep" aria-hidden="true">:</span>
+          <div class="countdown-unit">
+            <span class="countdown-number" id="cd-hours">00</span>
+            <span class="countdown-label">HRS</span>
+          </div>
+          <span class="countdown-sep" aria-hidden="true">:</span>
+          <div class="countdown-unit">
+            <span class="countdown-number" id="cd-mins">00</span>
+            <span class="countdown-label">MIN</span>
+          </div>
+          <span class="countdown-sep" aria-hidden="true">:</span>
+          <div class="countdown-unit">
+            <span class="countdown-number" id="cd-secs">00</span>
+            <span class="countdown-label">SEC</span>
+          </div>
+        </div>
+        <h2 class="cta-title">BE FIRST TO PLAY</h2>
+        <p class="cta-sub">Drop your email. We&rsquo;ll notify you the moment the doors open.</p>
+        <form class="signup-form" id="signup-form" novalidate>
+          <div class="form-row">
+            <label for="email-input" class="sr-only">Email address</label>
+            <input
+              type="email"
+              id="email-input"
+              name="email"
+              placeholder="your@email.com"
+              autocomplete="email"
+              required
+              aria-required="true"
+              aria-describedby="form-feedback"
+            >
+            <button type="submit" class="btn btn--primary">NOTIFY ME</button>
+          </div>
+          <p id="form-feedback" class="form-feedback" role="alert" aria-live="assertive"></p>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <p class="footer-logo">SERPENTINE</p>
+      <nav class="footer-nav" aria-label="Footer navigation">
+        <a href="#">Privacy</a>
+        <a href="#">Contact</a>
+      </nav>
+      <p class="footer-copy">&copy; 2026 Serpentine. All rights reserved.</p>
+      <p class="footer-credit">// BUILT WITH CANVAS + PURE JS</p>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
