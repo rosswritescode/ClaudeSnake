@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="description" content="Play SERPENTINE — a snake-like game playable on web and mobile.">
+  <title>SERPENTINE — Play</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+
+  <header class="site-header site-header--scrolled" role="banner">
+    <nav class="nav-container" aria-label="Game navigation">
+      <a href="index.html" class="nav-logo" aria-label="Back to home">
+        <span class="logo-bracket">[</span>SERPENTINE<span class="logo-bracket">]</span>
+      </a>
+      <div class="nav-game-score" aria-live="polite">
+        SCORE: <span id="nav-score-val">0</span>
+      </div>
+    </nav>
+  </header>
+
+  <main class="game-main">
+    <div class="game-wrapper">
+
+      <div class="canvas-wrap">
+        <canvas id="game-canvas" aria-label="Snake game board"></canvas>
+      </div>
+
+      <div class="score-bar">
+        <div class="score-item">
+          <span class="score-label">SCORE</span>
+          <span class="score-value" id="score-val">0</span>
+        </div>
+        <div class="score-item">
+          <span class="score-label">BEST</span>
+          <span class="score-value" id="hi-val">0</span>
+        </div>
+      </div>
+
+      <div class="settings-panel">
+        <div class="setting-row">
+          <span class="setting-label">BOARD</span>
+          <div class="setting-options" role="group" aria-label="Board size">
+            <button class="setting-btn" data-setting="size" data-value="small">S</button>
+            <button class="setting-btn setting-btn--active" data-setting="size" data-value="medium">M</button>
+            <button class="setting-btn" data-setting="size" data-value="large">L</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">SPEED</span>
+          <div class="setting-options" role="group" aria-label="Game speed">
+            <button class="setting-btn" data-setting="speed" data-value="slow">SLOW</button>
+            <button class="setting-btn setting-btn--active" data-setting="speed" data-value="normal">NORM</button>
+            <button class="setting-btn" data-setting="speed" data-value="fast">FAST</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-controls">
+        <button class="btn btn--primary" id="action-btn">START GAME</button>
+        <button class="btn btn--ghost" id="restart-btn" hidden>RESTART</button>
+      </div>
+
+      <div class="dpad" aria-label="Directional controls">
+        <button class="dpad-btn dpad-up"    data-dir="up"    aria-label="Move up">&#9650;</button>
+        <button class="dpad-btn dpad-left"  data-dir="left"  aria-label="Move left">&#9668;</button>
+        <button class="dpad-btn dpad-right" data-dir="right" aria-label="Move right">&#9658;</button>
+        <button class="dpad-btn dpad-down"  data-dir="down"  aria-label="Move down">&#9660;</button>
+      </div>
+
+      <p class="kb-hint">// ARROWS OR WASD &mdash; P TO PAUSE &mdash; SPACE TO START</p>
+
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>

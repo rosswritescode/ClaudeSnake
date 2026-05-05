@@ -162,6 +162,25 @@ ul { list-style: none; }
   transform: translateY(0);
 }
 
+.btn--outline {
+  background: transparent;
+  color: var(--color-snake);
+  border-color: var(--color-snake);
+}
+
+.btn--outline:hover,
+.btn--outline:focus-visible {
+  background: rgba(0, 255, 65, 0.08);
+  box-shadow: var(--glow-snake);
+  transform: translateY(-2px);
+  color: var(--color-snake);
+  text-shadow: none;
+}
+
+.btn--outline:active {
+  transform: translateY(0);
+}
+
 /* ============================================================
    Navigation
    ============================================================ */
@@ -351,7 +370,10 @@ ul { list-style: none; }
   font-weight: 300;
 }
 
-.hero-content .btn {
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
   margin-top: var(--space-sm);
 }
 
