@@ -1,0 +1,262 @@
+/* ============================================================
+   Game Page Layout
+   ============================================================ */
+.game-main {
+  padding-top: var(--nav-height);
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-bottom: var(--space-xl);
+}
+
+.game-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 580px;
+  padding: var(--space-md);
+  padding-top: var(--space-lg);
+}
+
+/* ============================================================
+   Canvas
+   ============================================================ */
+.canvas-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 540px;
+  border: 1px solid var(--color-border);
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  background: var(--color-bg);
+}
+
+.canvas-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right,  var(--color-bg) 0%, transparent 4%),
+    linear-gradient(to left,   var(--color-bg) 0%, transparent 4%),
+    linear-gradient(to bottom, var(--color-bg) 0%, transparent 4%),
+    linear-gradient(to top,    var(--color-bg) 0%, transparent 4%);
+  pointer-events: none;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+/* ============================================================
+   Score Bar
+   ============================================================ */
+.score-bar {
+  display: flex;
+  gap: var(--space-xl);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.score-label {
+  font-family: var(--font-pixel);
+  font-size: 0.4375rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.15em;
+}
+
+.score-value {
+  font-family: var(--font-pixel);
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  color: var(--color-snake);
+  text-shadow: var(--glow-snake);
+  min-width: 3ch;
+  text-align: center;
+}
+
+/* ============================================================
+   Settings Panel
+   ============================================================ */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  width: 100%;
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.setting-label {
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.1em;
+  min-width: 52px;
+}
+
+.setting-options {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.setting-btn {
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.setting-btn:hover {
+  border-color: var(--color-snake);
+  color: var(--color-snake);
+}
+
+.setting-btn:focus-visible {
+  outline: 2px solid var(--color-snake);
+  outline-offset: 2px;
+}
+
+.setting-btn--active {
+  border-color: var(--color-snake);
+  color: var(--color-snake);
+  background: rgba(0, 255, 65, 0.06);
+}
+
+/* ============================================================
+   Game Controls (action buttons)
+   ============================================================ */
+.game-controls {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.btn--ghost:hover,
+.btn--ghost:focus-visible {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================================
+   D-Pad
+   ============================================================ */
+.dpad {
+  display: grid;
+  grid-template-areas:
+    ".    up   ."
+    "left .    right"
+    ".    down .";
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 52px);
+  gap: 4px;
+}
+
+.dpad-btn {
+  font-size: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-snake);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.dpad-btn:active,
+.dpad-btn:focus-visible {
+  background: rgba(0, 255, 65, 0.14);
+  box-shadow: inset 0 0 0 1px var(--color-snake);
+  outline: none;
+}
+
+.dpad-up    { grid-area: up; }
+.dpad-left  { grid-area: left; }
+.dpad-right { grid-area: right; }
+.dpad-down  { grid-area: down; }
+
+/* ============================================================
+   Keyboard Hint
+   ============================================================ */
+.kb-hint {
+  font-family: var(--font-pixel);
+  font-size: 0.4375rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.1em;
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ============================================================
+   Nav Score (game page nav addition)
+   ============================================================ */
+.nav-game-score {
+  font-family: var(--font-pixel);
+  font-size: 0.5rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.1em;
+}
+
+/* ============================================================
+   Responsive: show D-pad on touch, keyboard hint on pointer
+   ============================================================ */
+@media (min-width: 768px) {
+  .dpad    { display: none; }
+  .kb-hint { display: block; }
+}
+
+@media (max-width: 767px) {
+  .kb-hint { display: none; }
+  .dpad    { display: grid; }
+}
+
+/* ============================================================
+   Reduced Motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .canvas-wrap {
+    border-color: var(--color-snake);
+  }
+}
