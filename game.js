@@ -78,7 +78,8 @@
   // ============================================================
   // State
   // ============================================================
-  let gameState = 'start'; // 'start' | 'playing' | 'paused' | 'gameover'
+  let gameState = 'start'; // 'start' | 'playing' | 'gameover' | 'win'
+  let gameEndTime = 0;
   let snake, currentDir, nextDir;
   let phase = 'red';        // 'red' | 'colour' | 'endgame'
   let redBall = null;       // { x, y } — the single red on the table
@@ -89,7 +90,9 @@
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings = { size: 'medium', speed: 'normal' };
+  let settings = { size: 'medium', speed: 'normal', reds: 8 };
+
+  function canRestart() { return Date.now() - gameEndTime >= 3000; }
 
   // ============================================================
   // DOM refs
@@ -221,7 +224,7 @@
         updateHighBreak();
         updateHUD();
         showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
-        if (redCount >= 8) {
+        if (redCount >= settings.reds) {
           startEndgame();
         } else {
           shiftRandomColours();
@@ -307,39 +310,31 @@
     animId = requestAnimationFrame(gameLoop);
   }
 
-  function togglePause() {
-    if (gameState === 'playing') {
-      gameState = 'paused';
-      cancelAnimationFrame(animId);
-      animId = null;
-      syncUI();
-      draw(0);
-    } else if (gameState === 'paused') {
-      gameState    = 'playing';
-      lastMoveTime = 0;
-      syncUI();
-      animId = requestAnimationFrame(gameLoop);
-    }
-  }
-
   function endGame() {
     gameState = 'gameover';
+    gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
     syncUI();
     draw(0);
+    actionBtn.disabled = true;
+    setTimeout(function () { actionBtn.disabled = false; }, 3000);
   }
 
   function winGame() {
     gameState = 'win';
+    gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
     syncUI();
     draw(0);
+    actionBtn.disabled = true;
+    setTimeout(function () { actionBtn.disabled = false; }, 3000);
   }
 
   function syncUI() {
-    var labels = { start: 'START GAME', playing: 'PAUSE', paused: 'RESUME', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN' };
-    actionBtn.textContent = labels[gameState];
-    restartBtn.hidden = (gameState !== 'playing' && gameState !== 'paused');
+    var labels = { start: 'START GAME', playing: 'PLAYING...', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN' };
+    actionBtn.textContent = labels[gameState] || 'START GAME';
+    actionBtn.hidden = (gameState === 'playing');
+    restartBtn.hidden = (gameState !== 'playing');
   }
 
   // ============================================================
@@ -377,7 +372,6 @@
     drawOnIndicator(size);
     if (potMessage) drawPotMessage(size, ts);
 
-    if (gameState === 'paused')   drawOverlay(size, 'PAUSED', '// TAP OR PRESS P TO RESUME', SNAKE_COLOR);
     if (gameState === 'gameover') drawGameOver(size);
     if (gameState === 'win')      drawWinScreen(size);
   }
@@ -447,7 +441,7 @@
 
   // Small "ON: RED" / "ON: COLOUR" indicator in top-right of canvas
   function drawOnIndicator(size) {
-    if (gameState !== 'playing' && gameState !== 'paused') return;
+    if (gameState !== 'playing') return;
     ctx.textAlign = 'right';
     var s = Math.max(5, Math.floor(size * 0.022));
     ctx.font = pixelFont(s);
@@ -506,7 +500,7 @@
     var s = Math.max(6, Math.floor(size * 0.022));
     ctx.font      = pixelFont(s);
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillText('8 REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
+    ctx.fillText(settings.reds + ' REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
 
     var s2 = Math.max(5, Math.floor(size * 0.018));
     ctx.font      = pixelFont(s2);
@@ -630,14 +624,9 @@
   };
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
-      if (gameState === 'playing' || gameState === 'paused') { e.preventDefault(); togglePause(); }
-      return;
-    }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') startGame();
-      else togglePause();
+      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) startGame();
       return;
     }
     var dir = KEY_DIRS[e.key];
@@ -645,9 +634,7 @@
     e.preventDefault();
     if (gameState === 'playing') {
       queueDir(dir);
-    } else if (gameState === 'paused') {
-      queueDir(dir); togglePause();
-    } else if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') {
+    } else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) {
       startGame(); queueDir(dir);
     }
   });
@@ -672,8 +659,7 @@
     e.preventDefault();
 
     if (Math.max(adx, ady) < 20) {
-      if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') startGame();
-      else togglePause();
+      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) startGame();
       return;
     }
 
@@ -681,9 +667,8 @@
       ? (dx > 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 })
       : (dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 });
 
-    if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') { startGame(); queueDir(dir); }
-    else if (gameState === 'paused') { queueDir(dir); togglePause(); }
-    else queueDir(dir);
+    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) { startGame(); queueDir(dir); }
+    else if (gameState === 'playing') queueDir(dir);
   }, { passive: false });
 
   // ============================================================
@@ -698,9 +683,8 @@
     function press() {
       var dir = DPAD_DIRS[btn.dataset.dir];
       if (!dir) return;
-      if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') { startGame(); queueDir(dir); }
-      else if (gameState === 'paused') { queueDir(dir); togglePause(); }
-      else queueDir(dir);
+      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) { startGame(); queueDir(dir); }
+      else if (gameState === 'playing') queueDir(dir);
     }
     btn.addEventListener('click', press);
     btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
@@ -710,8 +694,7 @@
   // Action & Restart buttons
   // ============================================================
   actionBtn.addEventListener('click', function () {
-    if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') startGame();
-    else togglePause();
+    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) startGame();
   });
 
   restartBtn.addEventListener('click', startGame);
@@ -723,10 +706,11 @@
     btn.addEventListener('click', function () {
       var setting = btn.dataset.setting;
       var value   = btn.dataset.value;
-      settings[setting] = value;
+      settings[setting] = (setting === 'reds') ? parseInt(value, 10) : value;
       document.querySelectorAll('.setting-btn[data-setting="' + setting + '"]').forEach(function (b) {
         b.classList.toggle('setting-btn--active', b.dataset.value === value);
       });
+      if (gameState === 'start') draw(0);
     });
   });
 
@@ -737,18 +721,9 @@
   window.addEventListener('resize', function () {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
-      var wasPlaying = gameState === 'playing';
-      if (wasPlaying) { cancelAnimationFrame(animId); animId = null; gameState = 'paused'; syncUI(); }
       resizeCanvas();
-      draw(0);
+      if (gameState !== 'playing') draw(0);
     }, 200);
-  });
-
-  // ============================================================
-  // Visibility — auto-pause when tab hidden
-  // ============================================================
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden && gameState === 'playing') togglePause();
   });
 
   // ============================================================
