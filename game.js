@@ -176,7 +176,7 @@
         updateHighBreak();
         updateHUD();
         showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
-        if (redCount >= 10) {
+        if (redCount >= 8) {
           startEndgame();
         } else {
           phase = 'red';
@@ -460,7 +460,7 @@
     var s = Math.max(6, Math.floor(size * 0.022));
     ctx.font      = pixelFont(s);
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillText('10 REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
+    ctx.fillText('8 REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
 
     var s2 = Math.max(5, Math.floor(size * 0.018));
     ctx.font      = pixelFont(s2);
