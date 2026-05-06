@@ -18,18 +18,43 @@
     { name: 'black',  value: 7, color: '#888888' },
   ];
 
-  // Colour ball positions as fractions of the grid (snooker spot mapping)
-  // yellow/green/brown on the baulk line (~75% down), blue centre,
-  // pink near top third, black near top cushion
-  function getColourPositions() {
+  // Canonical snooker spot positions — yellow/green/brown on baulk line,
+  // blue centre, pink pyramid spot, black top spot.
+  function getBaseColourPositions() {
     return [
-      { ...COLOUR_DEFS[0], x: Math.floor(cols * 0.25), y: Math.floor(cols * 0.75) }, // yellow – left baulk
-      { ...COLOUR_DEFS[1], x: Math.floor(cols * 0.75), y: Math.floor(cols * 0.75) }, // green  – right baulk
-      { ...COLOUR_DEFS[2], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.75) }, // brown  – centre baulk
-      { ...COLOUR_DEFS[3], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.50) }, // blue   – centre spot
-      { ...COLOUR_DEFS[4], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.27) }, // pink   – pyramid spot
-      { ...COLOUR_DEFS[5], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.10) }, // black  – top spot
+      { ...COLOUR_DEFS[0], origIdx: 0, x: Math.floor(cols * 0.25), y: Math.floor(cols * 0.75) }, // yellow
+      { ...COLOUR_DEFS[1], origIdx: 1, x: Math.floor(cols * 0.75), y: Math.floor(cols * 0.75) }, // green
+      { ...COLOUR_DEFS[2], origIdx: 2, x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.75) }, // brown
+      { ...COLOUR_DEFS[3], origIdx: 3, x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.50) }, // blue
+      { ...COLOUR_DEFS[4], origIdx: 4, x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.27) }, // pink
+      { ...COLOUR_DEFS[5], origIdx: 5, x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.10) }, // black
     ];
+  }
+
+  // Apply accumulated drift offsets — used during red/colour phase.
+  function getShiftedColourPositions() {
+    return getBaseColourPositions().map(function (ball) {
+      return Object.assign({}, ball, {
+        x: Math.max(1, Math.min(cols - 2, ball.x + colourOffsets[ball.origIdx].dx)),
+        y: Math.max(1, Math.min(cols - 2, ball.y + colourOffsets[ball.origIdx].dy)),
+      });
+    });
+  }
+
+  // After each red: nudge 2 random colours 2–3 cells in a cardinal direction.
+  function shiftRandomColours() {
+    var dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+    var idx = [0, 1, 2, 3, 4, 5];
+    for (var i = idx.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+    }
+    for (var k = 0; k < 2; k++) {
+      var dir  = dirs[Math.floor(Math.random() * 4)];
+      var dist = 2 + Math.floor(Math.random() * 2); // 2 or 3 cells
+      colourOffsets[idx[k]].dx += dir.dx * dist;
+      colourOffsets[idx[k]].dy += dir.dy * dist;
+    }
   }
 
   // ============================================================
@@ -40,7 +65,8 @@
   let phase = 'red';        // 'red' | 'colour' | 'endgame'
   let redBall = null;       // { x, y } — the single red on the table
   let colourBalls = [];     // array of colour ball objects when phase === 'colour' | 'endgame'
-  let redCount = 0;         // reds potted; at 10 triggers endgame
+  let colourOffsets = [];   // [{dx,dy}] per COLOUR_DEFS index — drift from original spot
+  let redCount = 0;         // reds potted; at 8 triggers endgame
   let currentBreak = 0;
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
@@ -88,10 +114,11 @@
     for (let i = 0; i < len; i++) snake.push({ x: mid - i, y: midY });
     currentDir   = { dx: 1, dy: 0 };
     nextDir      = null;
-    phase        = 'red';
-    redCount     = 0;
-    currentBreak = 0;
-    colourBalls  = [];
+    phase         = 'red';
+    redCount      = 0;
+    currentBreak  = 0;
+    colourBalls   = [];
+    colourOffsets = COLOUR_DEFS.map(function () { return { dx: 0, dy: 0 }; });
     potMessage   = null;
     lastMoveTime = 0;
     placeRed();
@@ -102,9 +129,9 @@
   // Ball placement
   // ============================================================
   function placeRed() {
-    // Avoid snake cells and all colour spots
+    // Avoid snake cells and current (shifted) colour spots
     const snakeKeys = new Set(snake.map(function (s) { return s.x + ',' + s.y; }));
-    const spotKeys  = new Set(getColourPositions().map(function (s) { return s.x + ',' + s.y; }));
+    const spotKeys  = new Set(getShiftedColourPositions().map(function (s) { return s.x + ',' + s.y; }));
     let pos;
     do {
       pos = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * cols) };
@@ -113,15 +140,14 @@
   }
 
   function placeColours() {
-    // All six colours appear on their fixed spots
-    colourBalls = getColourPositions();
+    colourBalls = getShiftedColourPositions();
     redBall = null;
   }
 
   function startEndgame() {
-    // After 10 reds: all colours appear, must be potted yellow → black
+    // Endgame uses canonical spots — offsets are irrelevant here
     phase = 'endgame';
-    colourBalls = getColourPositions(); // already sorted yellow → black
+    colourBalls = getBaseColourPositions();
     redBall = null;
     updateHUD();
     showPotMessage('POT IN ORDER!', '#f0d000');
@@ -164,6 +190,7 @@
       updateHighBreak();
       updateHUD();
       showPotMessage('RED  +1', '#cc2200');
+      shiftRandomColours();
       phase = 'colour';
       placeColours();
       ate = true;
@@ -172,6 +199,7 @@
       const idx = colourBalls.findIndex(function (b) { return b.x === nx && b.y === ny; });
       if (idx !== -1) {
         const ball = colourBalls[idx];
+        colourOffsets[ball.origIdx] = { dx: 0, dy: 0 }; // reset to original spot
         currentBreak += ball.value;
         updateHighBreak();
         updateHUD();
