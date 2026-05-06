@@ -7,16 +7,42 @@
   const GRID_SIZES = { small: 15, medium: 20, large: 30 };
   const SPEEDS     = { slow: 200, normal: 120, fast: 65 };
   const SNAKE_COLOR = '#00ff41';
-  const FOOD_COLOR  = '#ff4136';
+
+  // Snooker colour ball definitions (name, snooker value, display colour)
+  const COLOUR_DEFS = [
+    { name: 'yellow', value: 2, color: '#f0d000' },
+    { name: 'green',  value: 3, color: '#00aa44' },
+    { name: 'brown',  value: 4, color: '#8b4010' },
+    { name: 'blue',   value: 5, color: '#0077cc' },
+    { name: 'pink',   value: 6, color: '#ff5fa0' },
+    { name: 'black',  value: 7, color: '#888888' },
+  ];
+
+  // Colour ball positions as fractions of the grid (snooker spot mapping)
+  function getColourPositions() {
+    return [
+      { ...COLOUR_DEFS[0], x: Math.floor(cols * 0.25), y: Math.floor(cols * 0.75) }, // yellow – left baulk
+      { ...COLOUR_DEFS[1], x: Math.floor(cols * 0.75), y: Math.floor(cols * 0.75) }, // green  – right baulk
+      { ...COLOUR_DEFS[2], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.75) }, // brown  – centre baulk
+      { ...COLOUR_DEFS[3], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.50) }, // blue   – centre spot
+      { ...COLOUR_DEFS[4], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.27) }, // pink   – pyramid spot
+      { ...COLOUR_DEFS[5], x: Math.floor(cols * 0.50), y: Math.floor(cols * 0.10) }, // black  – top spot
+    ];
+  }
 
   // ============================================================
   // State
   // ============================================================
   let gameState = 'start'; // 'start' | 'playing' | 'paused' | 'gameover'
-  let snake, currentDir, nextDir, food, score;
-  let highScore  = parseInt(localStorage.getItem('serpentine_hi') || '0', 10);
+  let snake, currentDir, nextDir;
+  let phase = 'red';        // 'red' | 'colour'
+  let redBall = null;       // { x, y } — the single red on the table
+  let colourBalls = [];     // array of colour ball objects when phase === 'colour'
+  let currentBreak = 0;
+  let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
+  let potMessage = null;    // { text, color, startTs }
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings   = { size: 'medium', speed: 'normal' };
+  let settings = { size: 'medium', speed: 'normal' };
 
   // ============================================================
   // DOM refs
@@ -25,6 +51,7 @@
   const ctx        = canvas.getContext('2d');
   const scoreEl    = document.getElementById('score-val');
   const hiEl       = document.getElementById('hi-val');
+  const onEl       = document.getElementById('on-val');
   const navScoreEl = document.getElementById('nav-score-val');
   const actionBtn  = document.getElementById('action-btn');
   const restartBtn = document.getElementById('restart-btn');
@@ -51,36 +78,44 @@
   // ============================================================
   function initGame() {
     resizeCanvas();
-    const mid    = Math.floor(cols / 2);
-    const midY   = Math.floor(cols / 2);
-    const len    = Math.min(4, Math.floor(cols / 4));
+    const mid  = Math.floor(cols / 2);
+    const midY = Math.floor(cols / 2);
+    const len  = Math.min(4, Math.floor(cols / 4));
     snake = [];
     for (let i = 0; i < len; i++) snake.push({ x: mid - i, y: midY });
-    currentDir = { dx: 1, dy: 0 };
-    nextDir    = null;
-    score      = 0;
-    placeFood();
+    currentDir   = { dx: 1, dy: 0 };
+    nextDir      = null;
+    phase        = 'red';
+    currentBreak = 0;
+    colourBalls  = [];
+    potMessage   = null;
     lastMoveTime = 0;
+    placeRed();
     updateHUD();
   }
 
   // ============================================================
-  // Food
+  // Ball placement
   // ============================================================
-  function placeFood() {
-    const occupied = new Set(snake.map(function (s) { return s.x + ',' + s.y; }));
+  function placeRed() {
+    // Avoid snake cells and all colour spots
+    const snakeKeys = new Set(snake.map(function (s) { return s.x + ',' + s.y; }));
+    const spotKeys  = new Set(getColourPositions().map(function (s) { return s.x + ',' + s.y; }));
     let pos;
     do {
-      pos = {
-        x: Math.floor(Math.random() * cols),
-        y: Math.floor(Math.random() * cols),
-      };
-    } while (occupied.has(pos.x + ',' + pos.y));
-    food = pos;
+      pos = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * cols) };
+    } while (snakeKeys.has(pos.x + ',' + pos.y) || spotKeys.has(pos.x + ',' + pos.y));
+    redBall = pos;
+  }
+
+  function placeColours() {
+    // All six colours appear on their fixed spots
+    colourBalls = getColourPositions();
+    redBall = null;
   }
 
   // ============================================================
-  // Direction queue—prevents 180° reversal
+  // Direction queue — prevents 180° reversal
   // ============================================================
   function queueDir(dir) {
     const ref = nextDir || currentDir;
@@ -97,24 +132,50 @@
     const nx = snake[0].x + currentDir.dx;
     const ny = snake[0].y + currentDir.dy;
 
+    // Wall collision
     if (nx < 0 || nx >= cols || ny < 0 || ny >= cols) { endGame(); return; }
 
+    // Self collision — skip last segment (it's about to vacate)
     for (let i = 0; i < snake.length - 1; i++) {
       if (snake[i].x === nx && snake[i].y === ny) { endGame(); return; }
     }
 
     snake.unshift({ x: nx, y: ny });
 
-    if (nx === food.x && ny === food.y) {
-      score++;
-      if (score > highScore) {
-        highScore = score;
-        localStorage.setItem('serpentine_hi', String(highScore));
-      }
+    let ate = false;
+
+    if (phase === 'red' && redBall && nx === redBall.x && ny === redBall.y) {
+      // Potted the red
+      currentBreak += 1;
+      updateHighBreak();
       updateHUD();
-      placeFood();
-    } else {
-      snake.pop();
+      showPotMessage('RED  +1', '#cc2200');
+      phase = 'colour';
+      placeColours();
+      ate = true;
+
+    } else if (phase === 'colour') {
+      const idx = colourBalls.findIndex(function (b) { return b.x === nx && b.y === ny; });
+      if (idx !== -1) {
+        const ball = colourBalls[idx];
+        currentBreak += ball.value;
+        updateHighBreak();
+        updateHUD();
+        showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
+        phase = 'red';
+        colourBalls = [];
+        placeRed();
+        ate = true;
+      }
+    }
+
+    if (!ate) snake.pop();
+  }
+
+  function updateHighBreak() {
+    if (currentBreak > highBreak) {
+      highBreak = currentBreak;
+      localStorage.setItem('serpentine_hi_break', String(highBreak));
     }
   }
 
@@ -122,9 +183,28 @@
   // HUD
   // ============================================================
   function updateHUD() {
-    scoreEl.textContent    = score;
-    hiEl.textContent       = highScore;
-    navScoreEl.textContent = score;
+    scoreEl.textContent    = currentBreak;
+    hiEl.textContent       = highBreak;
+    navScoreEl.textContent = currentBreak;
+
+    if (onEl) {
+      if (phase === 'red') {
+        onEl.textContent  = 'RED';
+        onEl.style.color  = '#cc2200';
+        onEl.style.textShadow = '0 0 8px rgba(204,34,0,0.7)';
+      } else {
+        onEl.textContent  = 'COLOUR';
+        onEl.style.color  = '#f0d000';
+        onEl.style.textShadow = '0 0 8px rgba(240,208,0,0.7)';
+      }
+    }
+  }
+
+  // ============================================================
+  // Pot message (brief canvas overlay text after potting)
+  // ============================================================
+  function showPotMessage(text, color) {
+    potMessage = { text: text, color: color, startTs: null };
   }
 
   // ============================================================
@@ -183,7 +263,6 @@
   // Rendering
   // ============================================================
   function canvasSize() { return canvas.width / dpr; }
-
   function pixelFont(px) { return px + 'px "Press Start 2P", monospace'; }
 
   function draw(ts) {
@@ -192,12 +271,17 @@
     ctx.fillRect(0, 0, size, size);
     drawGrid(size);
 
-    if (gameState === 'start')    { drawStartScreen(size); return; }
+    if (gameState === 'start') { drawStartScreen(size); return; }
 
-    drawFood(ts, size);
-    drawSnake(size);
+    // Balls
+    if (phase === 'red' && redBall) drawRedBall(ts);
+    if (phase === 'colour')         drawColourBalls(ts);
 
-    if (gameState === 'paused')   drawOverlay(size, 'PAUSED',    '// TAP OR PRESS P TO RESUME', SNAKE_COLOR);
+    drawSnake();
+    drawOnIndicator(size);
+    if (potMessage) drawPotMessage(size, ts);
+
+    if (gameState === 'paused')   drawOverlay(size, 'PAUSED', '// TAP OR PRESS P TO RESUME', SNAKE_COLOR);
     if (gameState === 'gameover') drawGameOver(size);
   }
 
@@ -223,16 +307,82 @@
     ctx.shadowBlur = 0;
   }
 
-  function drawFood(ts) {
-    var pulse = 0.55 + 0.45 * Math.sin(ts / 300);
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle   = FOOD_COLOR;
-    ctx.shadowColor = FOOD_COLOR;
-    ctx.shadowBlur  = 16;
-    var p = Math.max(1, cellSize * 0.12);
-    ctx.fillRect(food.x * cellSize + p, food.y * cellSize + p, cellSize - p * 2, cellSize - p * 2);
+  // Draw a single snooker ball at grid position (gx, gy)
+  function drawBall(gx, gy, color, alpha) {
+    var cx = (gx + 0.5) * cellSize;
+    var cy = (gy + 0.5) * cellSize;
+    var r  = Math.max(3, cellSize * 0.38);
+
+    if (alpha !== undefined) ctx.globalAlpha = alpha;
+
+    // Ball body
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle   = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Specular highlight — top-left offset white circle
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.28, cy - r * 0.30, r * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fill();
+
     ctx.globalAlpha = 1;
+  }
+
+  function drawRedBall(ts) {
+    var pulse = 0.65 + 0.35 * Math.sin(ts / 300);
+    drawBall(redBall.x, redBall.y, '#cc2200', pulse);
+  }
+
+  function drawColourBalls(ts) {
+    // All six breathe together gently so the table feels alive
+    var breathe = 0.8 + 0.2 * Math.sin(ts / 600);
+    colourBalls.forEach(function (ball) {
+      drawBall(ball.x, ball.y, ball.color, breathe);
+    });
+  }
+
+  // Small "ON: RED" / "ON: COLOUR" indicator in top-right of canvas
+  function drawOnIndicator(size) {
+    if (gameState !== 'playing' && gameState !== 'paused') return;
+    ctx.textAlign = 'right';
+    var s = Math.max(5, Math.floor(size * 0.022));
+    ctx.font = pixelFont(s);
+    var label = phase === 'red' ? 'ON: RED' : 'ON: COLOUR';
+    var color = phase === 'red' ? '#cc2200' : '#f0d000';
+    ctx.fillStyle   = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 6;
+    ctx.fillText(label, size - 6, s + 8);
     ctx.shadowBlur  = 0;
+    ctx.textAlign   = 'left';
+  }
+
+  // Pot confirmation message — fades in then out over ~1.4s
+  function drawPotMessage(size, ts) {
+    if (!potMessage) return;
+    if (!potMessage.startTs) potMessage.startTs = ts;
+    var elapsed  = ts - potMessage.startTs;
+    var duration = 1400;
+    if (elapsed > duration) { potMessage = null; return; }
+    var alpha = elapsed < 250 ? elapsed / 250 : 1 - (elapsed - 250) / (duration - 250);
+    alpha = Math.max(0, Math.min(1, alpha));
+
+    ctx.globalAlpha = alpha;
+    ctx.textAlign   = 'center';
+    var s = Math.max(8, Math.floor(size * 0.032));
+    ctx.font        = pixelFont(s);
+    ctx.fillStyle   = potMessage.color;
+    ctx.shadowColor = potMessage.color;
+    ctx.shadowBlur  = 12;
+    ctx.fillText(potMessage.text, size / 2, size * 0.12);
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
+    ctx.textAlign   = 'left';
   }
 
   function drawStartScreen(size) {
@@ -245,13 +395,18 @@
     ctx.fillStyle   = SNAKE_COLOR;
     ctx.shadowColor = SNAKE_COLOR;
     ctx.shadowBlur  = 22;
-    ctx.fillText('SERPENTINE', size / 2, size * 0.4);
+    ctx.fillText('SERPENTINE', size / 2, size * 0.38);
     ctx.shadowBlur = 0;
 
-    var s = Math.max(6, Math.floor(size * 0.024));
+    var s = Math.max(6, Math.floor(size * 0.022));
     ctx.font      = pixelFont(s);
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillText('SELECT OPTIONS + PRESS START', size / 2, size * 0.4 + t * 2.4);
+    ctx.fillText('RED → COLOUR → RED', size / 2, size * 0.38 + t * 2.2);
+
+    var s2 = Math.max(5, Math.floor(size * 0.018));
+    ctx.font      = pixelFont(s2);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillText('SELECT OPTIONS + PRESS START', size / 2, size * 0.38 + t * 2.2 + s * 2.4);
     ctx.textAlign = 'left';
   }
 
@@ -280,30 +435,40 @@
     ctx.fillRect(0, 0, size, size);
     ctx.textAlign = 'center';
 
+    // "GAME OVER"
     var t = Math.max(11, Math.floor(size * 0.046));
     ctx.font        = pixelFont(t);
-    ctx.fillStyle   = FOOD_COLOR;
-    ctx.shadowColor = FOOD_COLOR;
+    ctx.fillStyle   = '#cc2200';
+    ctx.shadowColor = '#cc2200';
     ctx.shadowBlur  = 16;
-    ctx.fillText('GAME OVER', size / 2, size * 0.35);
+    ctx.fillText('GAME OVER', size / 2, size * 0.30);
     ctx.shadowBlur = 0;
 
-    var sc = Math.max(10, Math.floor(size * 0.042));
+    // "BREAK" label
+    var bl = Math.max(5, Math.floor(size * 0.020));
+    ctx.font      = pixelFont(bl);
+    ctx.fillStyle = '#444';
+    ctx.fillText('BREAK', size / 2, size * 0.30 + t * 2.0);
+
+    // Break number
+    var sc = Math.max(10, Math.floor(size * 0.044));
     ctx.font        = pixelFont(sc);
     ctx.fillStyle   = SNAKE_COLOR;
     ctx.shadowColor = SNAKE_COLOR;
     ctx.shadowBlur  = 10;
-    ctx.fillText(String(score).padStart(5, '0'), size / 2, size * 0.35 + t * 2.2);
+    ctx.fillText(String(currentBreak).padStart(3, '0'), size / 2, size * 0.30 + t * 2.0 + bl * 2.0 + sc * 0.9);
     ctx.shadowBlur = 0;
 
+    // High break line
     var hi = Math.max(6, Math.floor(size * 0.021));
     ctx.font      = pixelFont(hi);
-    var isNew     = score > 0 && score >= highScore;
+    var isNew     = currentBreak > 0 && currentBreak >= highBreak;
     ctx.fillStyle = isNew ? '#ffd700' : '#444';
-    var hiText    = isNew
-      ? '// NEW HIGH SCORE!'
-      : '// BEST: ' + String(highScore).padStart(5, '0');
-    ctx.fillText(hiText, size / 2, size * 0.35 + t * 2.2 + sc * 2.5);
+    ctx.fillText(
+      isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
+      size / 2,
+      size * 0.30 + t * 2.0 + bl * 2.0 + sc * 0.9 + hi * 3.2
+    );
 
     ctx.textAlign = 'left';
   }
@@ -322,32 +487,24 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
-      if (gameState === 'playing' || gameState === 'paused') {
-        e.preventDefault();
-        togglePause();
-      }
+      if (gameState === 'playing' || gameState === 'paused') { e.preventDefault(); togglePause(); }
       return;
     }
-
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (gameState === 'start' || gameState === 'gameover') startGame();
       else togglePause();
       return;
     }
-
     var dir = KEY_DIRS[e.key];
     if (!dir) return;
     e.preventDefault();
-
     if (gameState === 'playing') {
       queueDir(dir);
     } else if (gameState === 'paused') {
-      queueDir(dir);
-      togglePause();
+      queueDir(dir); togglePause();
     } else if (gameState === 'start' || gameState === 'gameover') {
-      startGame();
-      queueDir(dir);
+      startGame(); queueDir(dir);
     }
   });
 
@@ -364,10 +521,9 @@
 
   canvas.addEventListener('touchend', function (e) {
     if (t0x === undefined) return;
-    var dx  = e.changedTouches[0].clientX - t0x;
-    var dy  = e.changedTouches[0].clientY - t0y;
-    var adx = Math.abs(dx);
-    var ady = Math.abs(dy);
+    var dx = e.changedTouches[0].clientX - t0x;
+    var dy = e.changedTouches[0].clientY - t0y;
+    var adx = Math.abs(dx), ady = Math.abs(dy);
     t0x = t0y = undefined;
     e.preventDefault();
 
@@ -381,38 +537,26 @@
       ? (dx > 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 })
       : (dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 });
 
-    if (gameState === 'start' || gameState === 'gameover') {
-      startGame();
-      queueDir(dir);
-    } else if (gameState === 'paused') {
-      queueDir(dir);
-      togglePause();
-    } else {
-      queueDir(dir);
-    }
+    if (gameState === 'start' || gameState === 'gameover') { startGame(); queueDir(dir); }
+    else if (gameState === 'paused') { queueDir(dir); togglePause(); }
+    else queueDir(dir);
   }, { passive: false });
 
   // ============================================================
   // D-pad input
   // ============================================================
   var DPAD_DIRS = {
-    up:    { dx: 0, dy: -1 }, down:  { dx: 0, dy: 1 },
-    left:  { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
+    up: { dx: 0, dy: -1 }, down:  { dx: 0, dy: 1 },
+    left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
   };
 
   document.querySelectorAll('.dpad-btn').forEach(function (btn) {
     function press() {
       var dir = DPAD_DIRS[btn.dataset.dir];
       if (!dir) return;
-      if (gameState === 'start' || gameState === 'gameover') {
-        startGame();
-        queueDir(dir);
-      } else if (gameState === 'paused') {
-        queueDir(dir);
-        togglePause();
-      } else {
-        queueDir(dir);
-      }
+      if (gameState === 'start' || gameState === 'gameover') { startGame(); queueDir(dir); }
+      else if (gameState === 'paused') { queueDir(dir); togglePause(); }
+      else queueDir(dir);
     }
     btn.addEventListener('click', press);
     btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
@@ -443,26 +587,21 @@
   });
 
   // ============================================================
-  // Window resize
+  // Window resize — pause if playing, resize canvas, redraw
   // ============================================================
   var resizeTimer;
   window.addEventListener('resize', function () {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
       var wasPlaying = gameState === 'playing';
-      if (wasPlaying) {
-        cancelAnimationFrame(animId);
-        animId    = null;
-        gameState = 'paused';
-        syncUI();
-      }
+      if (wasPlaying) { cancelAnimationFrame(animId); animId = null; gameState = 'paused'; syncUI(); }
       resizeCanvas();
       draw(0);
     }, 200);
   });
 
   // ============================================================
-  // Visibility—auto-pause when tab hidden
+  // Visibility — auto-pause when tab hidden
   // ============================================================
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && gameState === 'playing') togglePause();
@@ -471,13 +610,11 @@
   // ============================================================
   // Boot
   // ============================================================
-  hiEl.textContent = highScore;
+  hiEl.textContent = highBreak;
   syncUI();
+  updateHUD();
 
-  function boot() {
-    resizeCanvas();
-    draw(0);
-  }
+  function boot() { resizeCanvas(); draw(0); }
 
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(boot);

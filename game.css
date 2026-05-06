@@ -88,6 +88,14 @@
   text-align: center;
 }
 
+/* ON indicator — smaller font so "COLOUR" fits */
+.score-value--on {
+  font-size: clamp(0.5rem, 2.5vw, 0.75rem);
+  min-width: 5ch;
+  color: #cc2200; /* overridden by JS */
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
 /* ============================================================
    Settings Panel
    ============================================================ */
