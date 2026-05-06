@@ -41,19 +41,37 @@
     });
   }
 
-  // After each red: nudge 2 random colours 2–3 cells in a cardinal direction.
+  // After a colour is potted: nudge 2 random balls 2–3 cells, avoiding overlaps.
   function shiftRandomColours() {
-    var dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
-    var idx = [0, 1, 2, 3, 4, 5];
-    for (var i = idx.length - 1; i > 0; i--) {
+    var dirs  = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+    var bases = getBaseColourPositions();
+    var positions = getShiftedColourPositions(); // live positions for collision checks
+    var order = [0, 1, 2, 3, 4, 5];
+    for (var i = order.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
-      var t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+      var t = order[i]; order[i] = order[j]; order[j] = t;
     }
     for (var k = 0; k < 2; k++) {
-      var dir  = dirs[Math.floor(Math.random() * 4)];
-      var dist = 2 + Math.floor(Math.random() * 2); // 2 or 3 cells
-      colourOffsets[idx[k]].dx += dir.dx * dist;
-      colourOffsets[idx[k]].dy += dir.dy * dist;
+      var bi = order[k];
+      // Try each direction (randomised) until a non-colliding position is found
+      var shuffled = dirs.slice().sort(function () { return Math.random() - 0.5; });
+      for (var d = 0; d < shuffled.length; d++) {
+        var dist = 2 + Math.floor(Math.random() * 2);
+        var newOx = colourOffsets[bi].dx + shuffled[d].dx * dist;
+        var newOy = colourOffsets[bi].dy + shuffled[d].dy * dist;
+        var nx = Math.max(1, Math.min(cols - 2, bases[bi].x + newOx));
+        var ny = Math.max(1, Math.min(cols - 2, bases[bi].y + newOy));
+        var ok = true;
+        for (var m = 0; m < positions.length; m++) {
+          if (m !== bi && positions[m].x === nx && positions[m].y === ny) { ok = false; break; }
+        }
+        if (ok) {
+          colourOffsets[bi].dx = newOx;
+          colourOffsets[bi].dy = newOy;
+          positions[bi] = { x: nx, y: ny }; // update so next ball checks against this
+          break;
+        }
+      }
     }
   }
 
@@ -145,9 +163,9 @@
   }
 
   function startEndgame() {
-    // Endgame uses canonical spots — offsets are irrelevant here
+    // Endgame uses the current shifted positions, not canonical spots
     phase = 'endgame';
-    colourBalls = getBaseColourPositions();
+    colourBalls = getShiftedColourPositions();
     redBall = null;
     updateHUD();
     showPotMessage('POT IN ORDER!', '#f0d000');
@@ -190,7 +208,6 @@
       updateHighBreak();
       updateHUD();
       showPotMessage('RED  +1', '#cc2200');
-      shiftRandomColours();
       phase = 'colour';
       placeColours();
       ate = true;
@@ -207,6 +224,7 @@
         if (redCount >= 8) {
           startEndgame();
         } else {
+          shiftRandomColours();
           phase = 'red';
           colourBalls = [];
           placeRed();
