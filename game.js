@@ -37,9 +37,10 @@
   // ============================================================
   let gameState = 'start'; // 'start' | 'playing' | 'paused' | 'gameover'
   let snake, currentDir, nextDir;
-  let phase = 'red';        // 'red' | 'colour'
+  let phase = 'red';        // 'red' | 'colour' | 'endgame'
   let redBall = null;       // { x, y } — the single red on the table
-  let colourBalls = [];     // array of colour ball objects when phase === 'colour'
+  let colourBalls = [];     // array of colour ball objects when phase === 'colour' | 'endgame'
+  let redCount = 0;         // reds potted; at 10 triggers endgame
   let currentBreak = 0;
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
@@ -88,6 +89,7 @@
     currentDir   = { dx: 1, dy: 0 };
     nextDir      = null;
     phase        = 'red';
+    redCount     = 0;
     currentBreak = 0;
     colourBalls  = [];
     potMessage   = null;
@@ -114,6 +116,15 @@
     // All six colours appear on their fixed spots
     colourBalls = getColourPositions();
     redBall = null;
+  }
+
+  function startEndgame() {
+    // After 10 reds: all colours appear, must be potted yellow → black
+    phase = 'endgame';
+    colourBalls = getColourPositions(); // already sorted yellow → black
+    redBall = null;
+    updateHUD();
+    showPotMessage('POT IN ORDER!', '#f0d000');
   }
 
   // ============================================================
@@ -148,6 +159,7 @@
 
     if (phase === 'red' && redBall && nx === redBall.x && ny === redBall.y) {
       // Potted the red
+      redCount++;
       currentBreak += 1;
       updateHighBreak();
       updateHUD();
@@ -164,10 +176,34 @@
         updateHighBreak();
         updateHUD();
         showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
-        phase = 'red';
-        colourBalls = [];
-        placeRed();
+        if (redCount >= 10) {
+          startEndgame();
+        } else {
+          phase = 'red';
+          colourBalls = [];
+          placeRed();
+        }
         ate = true;
+      }
+    } else if (phase === 'endgame') {
+      const idx = colourBalls.findIndex(function (b) { return b.x === nx && b.y === ny; });
+      if (idx !== -1) {
+        if (idx === 0) {
+          // Correct order — pot it
+          const ball = colourBalls[0];
+          currentBreak += ball.value;
+          updateHighBreak();
+          updateHUD();
+          showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
+          colourBalls.shift();
+          if (colourBalls.length === 0) { winGame(); return; }
+          ate = true;
+        } else {
+          // Wrong order — foul
+          showPotMessage('FOUL!', '#ff4136');
+          endGame();
+          return;
+        }
       }
     }
 
@@ -194,6 +230,11 @@
         onEl.textContent  = 'RED';
         onEl.style.color  = '#cc2200';
         onEl.style.textShadow = '0 0 8px rgba(204,34,0,0.7)';
+      } else if (phase === 'endgame' && colourBalls.length > 0) {
+        const tgt = colourBalls[0];
+        onEl.textContent  = tgt.name.toUpperCase();
+        onEl.style.color  = tgt.color;
+        onEl.style.textShadow = '0 0 8px ' + tgt.color + '99';
       } else {
         onEl.textContent  = 'COLOUR';
         onEl.style.color  = '#f0d000';
@@ -242,8 +283,15 @@
     draw(0);
   }
 
+  function winGame() {
+    gameState = 'win';
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    syncUI();
+    draw(0);
+  }
+
   function syncUI() {
-    var labels = { start: 'START GAME', playing: 'PAUSE', paused: 'RESUME', gameover: 'PLAY AGAIN' };
+    var labels = { start: 'START GAME', playing: 'PAUSE', paused: 'RESUME', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN' };
     actionBtn.textContent = labels[gameState];
     restartBtn.hidden = (gameState !== 'playing' && gameState !== 'paused');
   }
@@ -276,8 +324,8 @@
     if (gameState === 'start') { drawStartScreen(size); return; }
 
     // Balls
-    if (phase === 'red' && redBall) drawRedBall(ts);
-    if (phase === 'colour')         drawColourBalls(ts);
+    if (phase === 'red' && redBall)               drawRedBall(ts);
+    if (phase === 'colour' || phase === 'endgame') drawColourBalls(ts);
 
     drawSnake();
     drawOnIndicator(size);
@@ -285,6 +333,7 @@
 
     if (gameState === 'paused')   drawOverlay(size, 'PAUSED', '// TAP OR PRESS P TO RESUME', SNAKE_COLOR);
     if (gameState === 'gameover') drawGameOver(size);
+    if (gameState === 'win')      drawWinScreen(size);
   }
 
   function drawGrid(size) {
@@ -341,10 +390,12 @@
   }
 
   function drawColourBalls(ts) {
-    // All six breathe together gently so the table feels alive
     var breathe = 0.8 + 0.2 * Math.sin(ts / 600);
-    colourBalls.forEach(function (ball) {
-      drawBall(ball.x, ball.y, ball.color, breathe);
+    colourBalls.forEach(function (ball, i) {
+      var alpha = (phase === 'endgame')
+        ? (i === 0 ? 0.65 + 0.35 * Math.sin(ts / 300) : 0.22)
+        : breathe;
+      drawBall(ball.x, ball.y, ball.color, alpha);
     });
   }
 
@@ -354,8 +405,14 @@
     ctx.textAlign = 'right';
     var s = Math.max(5, Math.floor(size * 0.022));
     ctx.font = pixelFont(s);
-    var label = phase === 'red' ? 'ON: RED' : 'ON: COLOUR';
-    var color = phase === 'red' ? '#cc2200' : '#f0d000';
+    var label, color;
+    if (phase === 'red') {
+      label = 'ON: RED'; color = '#cc2200';
+    } else if (phase === 'endgame' && colourBalls.length > 0) {
+      label = 'ON: ' + colourBalls[0].name.toUpperCase(); color = colourBalls[0].color;
+    } else {
+      label = 'ON: COLOUR'; color = '#f0d000';
+    }
     ctx.fillStyle   = color;
     ctx.shadowColor = color;
     ctx.shadowBlur  = 6;
@@ -403,7 +460,7 @@
     var s = Math.max(6, Math.floor(size * 0.022));
     ctx.font      = pixelFont(s);
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillText('RED → COLOUR → RED', size / 2, size * 0.38 + t * 2.2);
+    ctx.fillText('10 REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
 
     var s2 = Math.max(5, Math.floor(size * 0.018));
     ctx.font      = pixelFont(s2);
@@ -475,6 +532,45 @@
     ctx.textAlign = 'left';
   }
 
+  function drawWinScreen(size) {
+    ctx.fillStyle = 'rgba(10,10,10,0.92)';
+    ctx.fillRect(0, 0, size, size);
+    ctx.textAlign = 'center';
+
+    var t = Math.max(11, Math.floor(size * 0.046));
+    ctx.font        = pixelFont(t);
+    ctx.fillStyle   = '#ffd700';
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur  = 22;
+    ctx.fillText('FRAME OVER', size / 2, size * 0.28);
+    ctx.shadowBlur  = 0;
+
+    var bl = Math.max(5, Math.floor(size * 0.020));
+    ctx.font      = pixelFont(bl);
+    ctx.fillStyle = '#444';
+    ctx.fillText('BREAK', size / 2, size * 0.28 + t * 2.0);
+
+    var sc = Math.max(10, Math.floor(size * 0.044));
+    ctx.font        = pixelFont(sc);
+    ctx.fillStyle   = SNAKE_COLOR;
+    ctx.shadowColor = SNAKE_COLOR;
+    ctx.shadowBlur  = 10;
+    ctx.fillText(String(currentBreak).padStart(3, '0'), size / 2, size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9);
+    ctx.shadowBlur  = 0;
+
+    var hi = Math.max(6, Math.floor(size * 0.021));
+    ctx.font      = pixelFont(hi);
+    var isNew     = currentBreak > 0 && currentBreak >= highBreak;
+    ctx.fillStyle = isNew ? '#ffd700' : '#444';
+    ctx.fillText(
+      isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
+      size / 2,
+      size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9 + hi * 3.2
+    );
+
+    ctx.textAlign = 'left';
+  }
+
   // ============================================================
   // Keyboard input
   // ============================================================
@@ -494,7 +590,7 @@
     }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if (gameState === 'start' || gameState === 'gameover') startGame();
+      if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') startGame();
       else togglePause();
       return;
     }
@@ -505,7 +601,7 @@
       queueDir(dir);
     } else if (gameState === 'paused') {
       queueDir(dir); togglePause();
-    } else if (gameState === 'start' || gameState === 'gameover') {
+    } else if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') {
       startGame(); queueDir(dir);
     }
   });
@@ -530,7 +626,7 @@
     e.preventDefault();
 
     if (Math.max(adx, ady) < 20) {
-      if (gameState === 'start' || gameState === 'gameover') startGame();
+      if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') startGame();
       else togglePause();
       return;
     }
@@ -539,7 +635,7 @@
       ? (dx > 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 })
       : (dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 });
 
-    if (gameState === 'start' || gameState === 'gameover') { startGame(); queueDir(dir); }
+    if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') { startGame(); queueDir(dir); }
     else if (gameState === 'paused') { queueDir(dir); togglePause(); }
     else queueDir(dir);
   }, { passive: false });
@@ -556,7 +652,7 @@
     function press() {
       var dir = DPAD_DIRS[btn.dataset.dir];
       if (!dir) return;
-      if (gameState === 'start' || gameState === 'gameover') { startGame(); queueDir(dir); }
+      if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') { startGame(); queueDir(dir); }
       else if (gameState === 'paused') { queueDir(dir); togglePause(); }
       else queueDir(dir);
     }
@@ -568,7 +664,7 @@
   // Action & Restart buttons
   // ============================================================
   actionBtn.addEventListener('click', function () {
-    if (gameState === 'start' || gameState === 'gameover') startGame();
+    if (gameState === 'start' || gameState === 'gameover' || gameState === 'win') startGame();
     else togglePause();
   });
 
