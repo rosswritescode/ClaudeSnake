@@ -40,7 +40,7 @@
   let phase = 'red';        // 'red' | 'colour' | 'endgame'
   let redBall = null;       // { x, y } — the single red on the table
   let colourBalls = [];     // array of colour ball objects when phase === 'colour' | 'endgame'
-  let redCount = 0;         // reds potted; at 10 triggers endgame
+  let redCount = 0;         // reds potted; at 8 triggers endgame
   let currentBreak = 0;
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
@@ -119,7 +119,7 @@
   }
 
   function startEndgame() {
-    // After 10 reds: all colours appear, must be potted yellow → black
+    // After 8 reds: all colours appear, must be potted yellow → black
     phase = 'endgame';
     colourBalls = getColourPositions(); // already sorted yellow → black
     redBall = null;
@@ -176,7 +176,7 @@
         updateHighBreak();
         updateHUD();
         showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
-        if (redCount >= 10) {
+        if (redCount >= 8) {
           startEndgame();
         } else {
           phase = 'red';
@@ -460,7 +460,7 @@
     var s = Math.max(6, Math.floor(size * 0.022));
     ctx.font      = pixelFont(s);
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillText('10 REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
+    ctx.fillText('8 REDS · COLOURS IN ORDER', size / 2, size * 0.38 + t * 2.2);
 
     var s2 = Math.max(5, Math.floor(size * 0.018));
     ctx.font      = pixelFont(s2);
