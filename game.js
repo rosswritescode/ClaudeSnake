@@ -91,7 +91,7 @@
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings = { size: 'medium', speed: 'normal', reds: 8, timer: 0 };
+  let settings = { size: 'medium', speed: 'normal', reds: 8, timer: 0, walls: 'solid' };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
 
@@ -191,11 +191,15 @@
   function step() {
     if (nextDir) { currentDir = nextDir; nextDir = null; }
 
-    const nx = snake[0].x + currentDir.dx;
-    const ny = snake[0].y + currentDir.dy;
+    let nx = snake[0].x + currentDir.dx;
+    let ny = snake[0].y + currentDir.dy;
 
-    // Wall collision
-    if (nx < 0 || nx >= cols || ny < 0 || ny >= cols) { endGame(); return; }
+    // Wall collision — solid ends game; wrap teleports to opposite side
+    if (nx < 0 || nx >= cols || ny < 0 || ny >= cols) {
+      if (settings.walls === 'solid') { endGame(); return; }
+      nx = (nx + cols) % cols;
+      ny = (ny + cols) % cols;
+    }
 
     // Self collision — skip last segment (it's about to vacate)
     for (let i = 0; i < snake.length - 1; i++) {
