@@ -6,7 +6,7 @@
   // ============================================================
   const GRID_SIZES = { small: 15, medium: 20, large: 30 };
   const SPEEDS     = { slow: 200, normal: 120, fast: 65 };
-  const SNAKE_COLOR = '#00ff41';
+  const SNAKE_COLOR = '#ffffff';
 
   // Snooker colour ball definitions (name, snooker value, display colour)
   const COLOUR_DEFS = [
@@ -385,7 +385,7 @@
 
   function draw(ts) {
     var size = canvasSize();
-    ctx.fillStyle = '#0a0a0a';
+    ctx.fillStyle = '#1b6b2a';
     ctx.fillRect(0, 0, size, size);
     drawGrid(size);
 
@@ -406,7 +406,7 @@
   }
 
   function drawGrid(size) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
     ctx.lineWidth   = 0.5;
     for (var i = 0; i <= cols; i++) {
       ctx.beginPath(); ctx.moveTo(i * cellSize, 0);    ctx.lineTo(i * cellSize, size); ctx.stroke();
@@ -419,8 +419,8 @@
     var flashMod  = foulFlash ? 0.15 + 0.85 * Math.abs(Math.sin(Date.now() / 45)) : 1;
     var len = snake.length;
     snake.forEach(function (seg, i) {
-      var alpha = (i === 0 ? 1 : Math.max(0.2, 1 - (i / len) * 0.78)) * flashMod;
-      ctx.fillStyle   = 'rgba(0,255,65,' + alpha + ')';
+      var alpha = (i === 0 ? 1 : Math.max(0.25, 1 - (i / len) * 0.72)) * flashMod;
+      ctx.fillStyle   = 'rgba(255,255,255,' + alpha + ')';
       ctx.shadowColor = SNAKE_COLOR;
       ctx.shadowBlur  = i === 0 ? 14 : 0;
       var p = Math.max(1, cellSize * 0.07);
@@ -511,7 +511,7 @@
       ctx.shadowColor = '#ff4136';
       ctx.shadowBlur  = 8;
     } else {
-      ctx.fillStyle   = '#444';
+      ctx.fillStyle   = 'rgba(255,255,255,0.5)';
       ctx.shadowBlur  = 0;
     }
 
@@ -553,7 +553,7 @@
     ctx.fillStyle   = SNAKE_COLOR;
     ctx.shadowColor = SNAKE_COLOR;
     ctx.shadowBlur  = 22;
-    ctx.fillText('SERPENTINE', size / 2, size * 0.38);
+    ctx.fillText('MAX SNAKE', size / 2, size * 0.38);
     ctx.shadowBlur = 0;
 
     var s = Math.max(6, Math.floor(size * 0.022));
