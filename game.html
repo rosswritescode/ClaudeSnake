@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="description" content="Play SERPENTINE — a snake-like game playable on web and mobile.">
-  <title>SERPENTINE — Play</title>
+  <meta name="description" content="Play MAX SNAKE — snooker-themed snake game for web and mobile.">
+  <title>MAX SNAKE — Play</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="game.css">
 </head>
-<body>
+<body class="game-page">
 
   <header class="site-header site-header--scrolled" role="banner">
     <nav class="nav-container" aria-label="Game navigation">
       <a href="index.html" class="nav-logo" aria-label="Back to home">
-        <span class="logo-bracket">[</span>SERPENTINE<span class="logo-bracket">]</span>
+        <span class="logo-bracket">[</span>MAX SNAKE<span class="logo-bracket">]</span>
       </a>
       <div class="nav-game-score" aria-live="polite">
         BREAK: <span id="nav-score-val">0</span>
@@ -26,10 +26,6 @@
 
   <main class="game-main">
     <div class="game-wrapper">
-
-      <div class="canvas-wrap">
-        <canvas id="game-canvas" aria-label="Snake game board"></canvas>
-      </div>
 
       <div class="score-bar">
         <div class="score-item">
@@ -44,6 +40,10 @@
           <span class="score-label">ON</span>
           <span class="score-value score-value--on" id="on-val">RED</span>
         </div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="game-canvas" aria-label="Snake game board"></canvas>
       </div>
 
       <div class="settings-panel">
