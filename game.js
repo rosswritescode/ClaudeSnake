@@ -260,11 +260,9 @@
           var penalty = Math.max(4, ball.value);
           currentBreak = Math.max(0, currentBreak - penalty);
           foulUntil = Date.now() + 500;
-          colourBalls.splice(idx, 1);
           showPotMessage('FOUL!  -' + penalty, '#ff4136');
           updateHUD();
-          if (colourBalls.length === 0) { winGame(); return; }
-          // ate stays false — snake doesn't grow on a foul
+          // ate stays false — snake doesn't grow, ball stays on table
         }
       }
     }
