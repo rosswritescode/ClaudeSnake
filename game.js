@@ -78,8 +78,9 @@
   // ============================================================
   // State
   // ============================================================
-  let gameState = 'start'; // 'start' | 'playing' | 'gameover' | 'win'
+  let gameState = 'start'; // 'start' | 'playing' | 'gameover' | 'win' | 'timeup'
   let gameEndTime = 0;
+  let timerStartTime = 0;
   let snake, currentDir, nextDir;
   let phase = 'red';        // 'red' | 'colour' | 'endgame'
   let redBall = null;       // { x, y } — the single red on the table
@@ -90,7 +91,7 @@
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings = { size: 'medium', speed: 'normal', reds: 8 };
+  let settings = { size: 'medium', speed: 'normal', reds: 8, timer: 0 };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
 
@@ -140,8 +141,9 @@
     currentBreak  = 0;
     colourBalls   = [];
     colourOffsets = COLOUR_DEFS.map(function () { return { dx: 0, dy: 0 }; });
-    potMessage   = null;
-    lastMoveTime = 0;
+    potMessage      = null;
+    lastMoveTime    = 0;
+    timerStartTime  = Date.now();
     placeRed();
     updateHUD();
   }
@@ -330,8 +332,19 @@
     setTimeout(function () { actionBtn.disabled = false; }, 3000);
   }
 
+  function timeUp() {
+    gameState = 'timeup';
+    gameEndTime = Date.now();
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    updateHighBreak();
+    syncUI();
+    draw(0);
+    actionBtn.disabled = true;
+    setTimeout(function () { actionBtn.disabled = false; }, 3000);
+  }
+
   function syncUI() {
-    var labels = { start: 'START GAME', playing: 'PLAYING...', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN' };
+    var labels = { start: 'START GAME', playing: 'PLAYING...', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN', timeup: 'PLAY AGAIN' };
     actionBtn.textContent = labels[gameState] || 'START GAME';
     actionBtn.hidden = (gameState === 'playing');
     restartBtn.hidden = (gameState !== 'playing');
@@ -342,6 +355,9 @@
   // ============================================================
   function gameLoop(ts) {
     animId = requestAnimationFrame(gameLoop);
+    if (settings.timer > 0 && Date.now() - timerStartTime >= settings.timer * 1000) {
+      timeUp(); return;
+    }
     if (ts - lastMoveTime >= SPEEDS[settings.speed]) {
       lastMoveTime = ts;
       step();
@@ -370,10 +386,12 @@
 
     drawSnake();
     drawOnIndicator(size);
+    drawTimer(size, ts);
     if (potMessage) drawPotMessage(size, ts);
 
     if (gameState === 'gameover') drawGameOver(size);
     if (gameState === 'win')      drawWinScreen(size);
+    if (gameState === 'timeup')   drawTimeUpScreen(size);
   }
 
   function drawGrid(size) {
@@ -459,6 +477,34 @@
     ctx.fillText(label, size - 6, s + 8);
     ctx.shadowBlur  = 0;
     ctx.textAlign   = 'left';
+  }
+
+  function drawTimer(size, ts) {
+    if (settings.timer === 0 || gameState !== 'playing') return;
+    var elapsed   = (Date.now() - timerStartTime) / 1000;
+    var remaining = Math.max(0, settings.timer - elapsed);
+    var mins  = Math.floor(remaining / 60);
+    var secs  = Math.floor(remaining % 60);
+    var label = mins + ':' + (secs < 10 ? '0' : '') + secs;
+    var isLow = remaining <= 10;
+
+    var s = Math.max(5, Math.floor(size * 0.022));
+    ctx.font      = pixelFont(s);
+    ctx.textAlign = 'left';
+
+    if (isLow) {
+      ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(ts / 150));
+      ctx.fillStyle   = '#ff4136';
+      ctx.shadowColor = '#ff4136';
+      ctx.shadowBlur  = 8;
+    } else {
+      ctx.fillStyle   = '#444';
+      ctx.shadowBlur  = 0;
+    }
+
+    ctx.fillText(label, 6, s + 8);
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
   }
 
   // Pot confirmation message — fades in then out over ~1.4s
@@ -611,6 +657,45 @@
     ctx.textAlign = 'left';
   }
 
+  function drawTimeUpScreen(size) {
+    ctx.fillStyle = 'rgba(10,10,10,0.92)';
+    ctx.fillRect(0, 0, size, size);
+    ctx.textAlign = 'center';
+
+    var t = Math.max(11, Math.floor(size * 0.046));
+    ctx.font        = pixelFont(t);
+    ctx.fillStyle   = '#ff8c00';
+    ctx.shadowColor = '#ff8c00';
+    ctx.shadowBlur  = 22;
+    ctx.fillText("TIME'S UP", size / 2, size * 0.28);
+    ctx.shadowBlur  = 0;
+
+    var bl = Math.max(5, Math.floor(size * 0.020));
+    ctx.font      = pixelFont(bl);
+    ctx.fillStyle = '#444';
+    ctx.fillText('BREAK', size / 2, size * 0.28 + t * 2.0);
+
+    var sc = Math.max(10, Math.floor(size * 0.044));
+    ctx.font        = pixelFont(sc);
+    ctx.fillStyle   = SNAKE_COLOR;
+    ctx.shadowColor = SNAKE_COLOR;
+    ctx.shadowBlur  = 10;
+    ctx.fillText(String(currentBreak).padStart(3, '0'), size / 2, size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9);
+    ctx.shadowBlur  = 0;
+
+    var hi = Math.max(6, Math.floor(size * 0.021));
+    ctx.font      = pixelFont(hi);
+    var isNew     = currentBreak > 0 && currentBreak >= highBreak;
+    ctx.fillStyle = isNew ? '#ffd700' : '#444';
+    ctx.fillText(
+      isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
+      size / 2,
+      size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9 + hi * 3.2
+    );
+
+    ctx.textAlign = 'left';
+  }
+
   // ============================================================
   // Keyboard input
   // ============================================================
@@ -626,7 +711,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) startGame();
+      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
       return;
     }
     var dir = KEY_DIRS[e.key];
@@ -634,7 +719,7 @@
     e.preventDefault();
     if (gameState === 'playing') {
       queueDir(dir);
-    } else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) {
+    } else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) {
       startGame(); queueDir(dir);
     }
   });
@@ -659,7 +744,7 @@
     e.preventDefault();
 
     if (Math.max(adx, ady) < 20) {
-      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) startGame();
+      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
       return;
     }
 
@@ -667,7 +752,7 @@
       ? (dx > 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 })
       : (dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 });
 
-    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) { startGame(); queueDir(dir); }
+    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
     else if (gameState === 'playing') queueDir(dir);
   }, { passive: false });
 
@@ -683,7 +768,7 @@
     function press() {
       var dir = DPAD_DIRS[btn.dataset.dir];
       if (!dir) return;
-      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) { startGame(); queueDir(dir); }
+      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
       else if (gameState === 'playing') queueDir(dir);
     }
     btn.addEventListener('click', press);
@@ -694,7 +779,7 @@
   // Action & Restart buttons
   // ============================================================
   actionBtn.addEventListener('click', function () {
-    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win') && canRestart()) startGame();
+    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
   });
 
   restartBtn.addEventListener('click', startGame);
@@ -706,7 +791,7 @@
     btn.addEventListener('click', function () {
       var setting = btn.dataset.setting;
       var value   = btn.dataset.value;
-      settings[setting] = (setting === 'reds') ? parseInt(value, 10) : value;
+      settings[setting] = (setting === 'reds' || setting === 'timer') ? parseInt(value, 10) : value;
       document.querySelectorAll('.setting-btn[data-setting="' + setting + '"]').forEach(function (b) {
         b.classList.toggle('setting-btn--active', b.dataset.value === value);
       });
