@@ -109,7 +109,7 @@
   position: relative;
   overflow: hidden;
   touch-action: none;
-  background: #1b6b2a;
+  background: #0d4d1a;
 }
 
 .canvas-wrap::after {
