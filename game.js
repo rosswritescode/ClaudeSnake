@@ -15,7 +15,7 @@
     { name: 'brown',  value: 4, color: '#8b4010' },
     { name: 'blue',   value: 5, color: '#0077cc' },
     { name: 'pink',   value: 6, color: '#ff5fa0' },
-    { name: 'black',  value: 7, color: '#888888' },
+    { name: 'black',  value: 7, color: '#111111' },
   ];
 
   // Canonical snooker spot positions — yellow/green/brown on baulk line,
@@ -92,7 +92,7 @@
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings = { size: 'medium', speed: 'normal', reds: 8, timer: 0, walls: 'solid' };
+  let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap' };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
 
@@ -385,7 +385,7 @@
 
   function draw(ts) {
     var size = canvasSize();
-    ctx.fillStyle = '#1b6b2a';
+    ctx.fillStyle = '#0d4d1a';
     ctx.fillRect(0, 0, size, size);
     drawGrid(size);
 
