@@ -81,6 +81,7 @@
   let gameState = 'start'; // 'start' | 'playing' | 'gameover' | 'win' | 'timeup'
   let gameEndTime = 0;
   let timerStartTime = 0;
+  let foulUntil = 0; // Date.now() + 500 during post-foul freeze
   let snake, currentDir, nextDir;
   let phase = 'red';        // 'red' | 'colour' | 'endgame'
   let redBall = null;       // { x, y } — the single red on the table
@@ -144,6 +145,7 @@
     potMessage      = null;
     lastMoveTime    = 0;
     timerStartTime  = Date.now();
+    foulUntil       = 0;
     placeRed();
     updateHUD();
   }
@@ -254,10 +256,15 @@
           if (colourBalls.length === 0) { winGame(); return; }
           ate = true;
         } else {
-          // Wrong order — foul
-          showPotMessage('FOUL!', '#ff4136');
-          endGame();
-          return;
+          // Wrong order — penalty, not game over
+          var penalty = Math.max(4, ball.value);
+          currentBreak = Math.max(0, currentBreak - penalty);
+          foulUntil = Date.now() + 500;
+          colourBalls.splice(idx, 1);
+          showPotMessage('FOUL!  -' + penalty, '#ff4136');
+          updateHUD();
+          if (colourBalls.length === 0) { winGame(); return; }
+          // ate stays false — snake doesn't grow on a foul
         }
       }
     }
@@ -364,8 +371,10 @@
     }
     if (ts - lastMoveTime >= SPEEDS[settings.speed]) {
       lastMoveTime = ts;
-      step();
-      if (gameState !== 'playing') return;
+      if (Date.now() >= foulUntil) {
+        step();
+        if (gameState !== 'playing') return;
+      }
     }
     draw(ts);
   }
@@ -408,9 +417,11 @@
   }
 
   function drawSnake() {
+    var foulFlash = foulUntil > 0 && Date.now() < foulUntil;
+    var flashMod  = foulFlash ? 0.15 + 0.85 * Math.abs(Math.sin(Date.now() / 45)) : 1;
     var len = snake.length;
     snake.forEach(function (seg, i) {
-      var alpha = i === 0 ? 1 : Math.max(0.2, 1 - (i / len) * 0.78);
+      var alpha = (i === 0 ? 1 : Math.max(0.2, 1 - (i / len) * 0.78)) * flashMod;
       ctx.fillStyle   = 'rgba(0,255,65,' + alpha + ')';
       ctx.shadowColor = SNAKE_COLOR;
       ctx.shadowBlur  = i === 0 ? 14 : 0;
