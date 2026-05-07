@@ -245,9 +245,9 @@
     } else if (phase === 'endgame') {
       const idx = colourBalls.findIndex(function (b) { return b.x === nx && b.y === ny; });
       if (idx !== -1) {
+        const ball = colourBalls[idx];
         if (idx === 0) {
           // Correct order — pot it
-          const ball = colourBalls[0];
           currentBreak += ball.value;
           updateHighBreak();
           updateHUD();
@@ -465,9 +465,9 @@
   function drawColourBalls(ts) {
     var breathe = 0.8 + 0.2 * Math.sin(ts / 600);
     colourBalls.forEach(function (ball, i) {
-      var alpha = (phase === 'endgame')
-        ? (i === 0 ? 0.65 + 0.35 * Math.sin(ts / 300) : 0.22)
-        : breathe;
+      var alpha = (phase === 'endgame' && i === 0)
+        ? 0.55 + 0.45 * Math.abs(Math.sin(ts / 260))  // target: fast strong pulse
+        : breathe;                                      // all others: normal breathe
       drawBall(ball.x, ball.y, ball.color, alpha);
     });
   }
