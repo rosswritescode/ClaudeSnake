@@ -7,6 +7,8 @@
   const GRID_SIZES = { small: 15, medium: 20, large: 30 };
   const SPEEDS     = { slow: 200, normal: 120, fast: 65 };
   const SNAKE_COLOR = '#ffffff';
+  const SPEED_WINDOW = 8000; // ms — pot within this window after previous pot for bonus
+  const SPEED_BONUS  = 2;   // bonus points awarded for a quick successive pot
 
   // Snooker colour ball definitions (name, snooker value, display colour)
   const COLOUR_DEFS = [
@@ -91,6 +93,7 @@
   let currentBreak = 0;
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
+  let lastPotTime = 0;      // Date.now() of most recent pot; 0 = none yet this game
   let animId, lastMoveTime, dpr, cols, cellSize;
   let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap' };
 
@@ -143,6 +146,7 @@
     colourBalls   = [];
     colourOffsets = COLOUR_DEFS.map(function () { return { dx: 0, dy: 0 }; });
     potMessage      = null;
+    lastPotTime     = 0;
     lastMoveTime    = 0;
     timerStartTime  = Date.now();
     foulUntil       = 0;
@@ -215,10 +219,13 @@
     if (phase === 'red' && redBall && nx === redBall.x && ny === redBall.y) {
       // Potted the red
       redCount++;
-      currentBreak += 1;
+      var nowR = Date.now();
+      var speedR = lastPotTime > 0 && (nowR - lastPotTime) <= SPEED_WINDOW ? SPEED_BONUS : 0;
+      lastPotTime = nowR;
+      currentBreak += 1 + speedR;
       updateHighBreak();
       updateHUD();
-      showPotMessage('RED  +1', '#cc2200');
+      showPotMessage('RED  +' + (1 + speedR) + (speedR ? '  *' : ''), '#cc2200');
       phase = 'colour';
       placeColours();
       ate = true;
@@ -228,10 +235,13 @@
       if (idx !== -1) {
         const ball = colourBalls[idx];
         colourOffsets[ball.origIdx] = { dx: 0, dy: 0 }; // reset to original spot
-        currentBreak += ball.value;
+        var nowC = Date.now();
+        var speedC = lastPotTime > 0 && (nowC - lastPotTime) <= SPEED_WINDOW ? SPEED_BONUS : 0;
+        lastPotTime = nowC;
+        currentBreak += ball.value + speedC;
         updateHighBreak();
         updateHUD();
-        showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
+        showPotMessage(ball.name.toUpperCase() + '  +' + (ball.value + speedC) + (speedC ? '  *' : ''), ball.color);
         if (redCount >= settings.reds) {
           startEndgame();
         } else {
@@ -248,10 +258,13 @@
         const ball = colourBalls[idx];
         if (idx === 0) {
           // Correct order — pot it
-          currentBreak += ball.value;
+          var nowE = Date.now();
+          var speedE = lastPotTime > 0 && (nowE - lastPotTime) <= SPEED_WINDOW ? SPEED_BONUS : 0;
+          lastPotTime = nowE;
+          currentBreak += ball.value + speedE;
           updateHighBreak();
           updateHUD();
-          showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, ball.color);
+          showPotMessage(ball.name.toUpperCase() + '  +' + (ball.value + speedE) + (speedE ? '  *' : ''), ball.color);
           colourBalls.shift();
           if (colourBalls.length === 0) { winGame(); return; }
           ate = true;
@@ -398,6 +411,7 @@
     drawSnake();
     drawOnIndicator(size);
     drawTimer(size, ts);
+    drawSpeedBar(size);
     if (potMessage) drawPotMessage(size, ts);
 
     if (gameState === 'gameover') drawGameOver(size);
@@ -518,6 +532,20 @@
     ctx.fillText(label, 6, s + 8);
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+  }
+
+  // Depleting bar at canvas bottom showing remaining speed-bonus window
+  function drawSpeedBar(size) {
+    if (lastPotTime === 0 || gameState !== 'playing') return;
+    var elapsed = Date.now() - lastPotTime;
+    if (elapsed >= SPEED_WINDOW) return;
+    var fraction = 1 - elapsed / SPEED_WINDOW;
+    var h = Math.max(3, Math.floor(cellSize * 0.18));
+    ctx.fillStyle   = fraction > 0.4 ? '#c8a530' : '#ff4136';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur  = 4;
+    ctx.fillRect(0, size - h, size * fraction, h);
+    ctx.shadowBlur  = 0;
   }
 
   // Pot confirmation message — fades in then out over ~1.4s
