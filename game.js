@@ -7,7 +7,7 @@
   const GRID_SIZES = { small: 15, medium: 20, large: 30 };
   const SPEEDS     = { slow: 200, normal: 120, fast: 65 };
   const SNAKE_COLOR = '#ffffff';
-  const SPEED_WINDOW = 6000; // bar visible for 6s; <3s = +2, 3-5s = +1, 5s+ = +0
+  // Speed bonus windows are configurable via settings (speedT1, speedT2 in seconds)
 
   // Snooker colour ball definitions (name, snooker value, display colour)
   const COLOUR_DEFS = [
@@ -94,7 +94,7 @@
   let potMessage = null;    // { text, color, startTs }
   let lastPotTime = 0;      // Date.now() of most recent pot; 0 = none yet this game
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap' };
+  let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2 };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
 
@@ -191,8 +191,8 @@
   }
 
   function calcSpeedBonus(elapsed) {
-    if (elapsed < 3000) return 2;
-    if (elapsed < 5000) return 1;
+    if (elapsed < settings.speedT1 * 1000) return 2;
+    if (elapsed < (settings.speedT1 + settings.speedT2) * 1000) return 1;
     return 0;
   }
 
@@ -539,16 +539,17 @@
     ctx.globalAlpha = 1;
   }
 
-  // Depleting bar at canvas bottom: gold for +2 (0-3s), gold for +1 (3-5s), grey for +0 (5-6s)
+  // Depleting bar showing available speed bonus; label at shrinking tip reads 2/1/0 BONUS PTS
   function drawSpeedBar(size) {
     if (lastPotTime === 0 || gameState !== 'playing') return;
-    var elapsed = Date.now() - lastPotTime;
-    if (elapsed >= SPEED_WINDOW) return;
-    var fraction  = 1 - elapsed / SPEED_WINDOW;
-    var bonus     = calcSpeedBonus(elapsed);
-    var fontSize  = Math.max(7, Math.floor(size * 0.026));
-    var h         = fontSize + 4;
-    var barW      = Math.max(1, size * fraction);
+    var elapsed    = Date.now() - lastPotTime;
+    var totalMs    = (settings.speedT1 + settings.speedT2 + 1) * 1000; // +1s tail shows "0"
+    if (elapsed >= totalMs) return;
+    var fraction   = 1 - elapsed / totalMs;
+    var bonus      = calcSpeedBonus(elapsed);
+    var fontSize   = Math.max(6, Math.floor(size * 0.017));
+    var h          = fontSize + 5;
+    var barW       = Math.max(1, size * fraction);
 
     ctx.fillStyle   = bonus > 0 ? '#c8a530' : '#3a3a3a';
     ctx.shadowColor = bonus > 0 ? '#c8a530' : 'transparent';
@@ -558,8 +559,8 @@
 
     ctx.font      = pixelFont(fontSize);
     ctx.fillStyle = bonus === 2 ? '#ffffff' : bonus === 1 ? '#ffd700' : '#555';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(bonus), Math.max(barW, fontSize), size - 2);
+    ctx.textAlign = 'right';
+    ctx.fillText(bonus + ' BONUS PTS', barW - 3, size - 2);
     ctx.textAlign = 'left';
   }
 
@@ -847,7 +848,8 @@
     btn.addEventListener('click', function () {
       var setting = btn.dataset.setting;
       var value   = btn.dataset.value;
-      settings[setting] = (setting === 'reds' || setting === 'timer') ? parseInt(value, 10) : value;
+      var intSettings = { reds: 1, timer: 1, speedT1: 1, speedT2: 1 };
+      settings[setting] = intSettings[setting] ? parseInt(value, 10) : value;
       document.querySelectorAll('.setting-btn[data-setting="' + setting + '"]').forEach(function (b) {
         b.classList.toggle('setting-btn--active', b.dataset.value === value);
       });
