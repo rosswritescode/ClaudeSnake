@@ -7,8 +7,7 @@
   const GRID_SIZES = { small: 15, medium: 20, large: 30 };
   const SPEEDS     = { slow: 200, normal: 120, fast: 65 };
   const SNAKE_COLOR = '#ffffff';
-  const SPEED_WINDOW = 8000; // ms — pot within this window after previous pot for bonus
-  const SPEED_BONUS  = 2;   // bonus points awarded for a quick successive pot
+  const SPEED_WINDOW = 6000; // bar visible for 6s; <3s = +2, 3-5s = +1, 5s+ = +0
 
   // Snooker colour ball definitions (name, snooker value, display colour)
   const COLOUR_DEFS = [
@@ -191,6 +190,12 @@
     nextDir = dir;
   }
 
+  function calcSpeedBonus(elapsed) {
+    if (elapsed < 3000) return 2;
+    if (elapsed < 5000) return 1;
+    return 0;
+  }
+
   // ============================================================
   // Movement step
   // ============================================================
@@ -220,7 +225,7 @@
       // Potted the red
       redCount++;
       var nowR = Date.now();
-      var speedR = lastPotTime > 0 && (nowR - lastPotTime) <= SPEED_WINDOW ? SPEED_BONUS : 0;
+      var speedR = lastPotTime > 0 ? calcSpeedBonus(nowR - lastPotTime) : 0;
       lastPotTime = nowR;
       currentBreak += 1 + speedR;
       updateHighBreak();
@@ -236,7 +241,7 @@
         const ball = colourBalls[idx];
         colourOffsets[ball.origIdx] = { dx: 0, dy: 0 }; // reset to original spot
         var nowC = Date.now();
-        var speedC = lastPotTime > 0 && (nowC - lastPotTime) <= SPEED_WINDOW ? SPEED_BONUS : 0;
+        var speedC = lastPotTime > 0 ? calcSpeedBonus(nowC - lastPotTime) : 0;
         lastPotTime = nowC;
         currentBreak += ball.value + speedC;
         updateHighBreak();
@@ -259,7 +264,7 @@
         if (idx === 0) {
           // Correct order — pot it
           var nowE = Date.now();
-          var speedE = lastPotTime > 0 && (nowE - lastPotTime) <= SPEED_WINDOW ? SPEED_BONUS : 0;
+          var speedE = lastPotTime > 0 ? calcSpeedBonus(nowE - lastPotTime) : 0;
           lastPotTime = nowE;
           currentBreak += ball.value + speedE;
           updateHighBreak();
@@ -534,18 +539,28 @@
     ctx.globalAlpha = 1;
   }
 
-  // Depleting bar at canvas bottom showing remaining speed-bonus window
+  // Depleting bar at canvas bottom: gold for +2 (0-3s), gold for +1 (3-5s), grey for +0 (5-6s)
   function drawSpeedBar(size) {
     if (lastPotTime === 0 || gameState !== 'playing') return;
     var elapsed = Date.now() - lastPotTime;
     if (elapsed >= SPEED_WINDOW) return;
-    var fraction = 1 - elapsed / SPEED_WINDOW;
-    var h = Math.max(3, Math.floor(cellSize * 0.18));
-    ctx.fillStyle   = fraction > 0.4 ? '#c8a530' : '#ff4136';
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur  = 4;
-    ctx.fillRect(0, size - h, size * fraction, h);
+    var fraction  = 1 - elapsed / SPEED_WINDOW;
+    var bonus     = calcSpeedBonus(elapsed);
+    var fontSize  = Math.max(7, Math.floor(size * 0.026));
+    var h         = fontSize + 4;
+    var barW      = Math.max(1, size * fraction);
+
+    ctx.fillStyle   = bonus > 0 ? '#c8a530' : '#3a3a3a';
+    ctx.shadowColor = bonus > 0 ? '#c8a530' : 'transparent';
+    ctx.shadowBlur  = bonus > 0 ? 5 : 0;
+    ctx.fillRect(0, size - h, barW, h);
     ctx.shadowBlur  = 0;
+
+    ctx.font      = pixelFont(fontSize);
+    ctx.fillStyle = bonus === 2 ? '#ffffff' : bonus === 1 ? '#ffd700' : '#555';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(bonus), Math.max(barW, fontSize), size - 2);
+    ctx.textAlign = 'left';
   }
 
   // Pot confirmation message — fades in then out over ~1.4s
