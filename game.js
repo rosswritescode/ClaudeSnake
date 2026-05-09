@@ -93,6 +93,7 @@
   let highBreak = parseInt(localStorage.getItem('serpentine_hi_break') || '0', 10);
   let potMessage = null;    // { text, color, startTs }
   let lastPotTime = 0;      // Date.now() of most recent pot; 0 = none yet this game
+  let breakHistory = [];    // { name, color, base, bonus } per pot/foul event
   let animId, lastMoveTime, dpr, cols, cellSize;
   let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2 };
 
@@ -146,6 +147,7 @@
     colourOffsets = COLOUR_DEFS.map(function () { return { dx: 0, dy: 0 }; });
     potMessage      = null;
     lastPotTime     = 0;
+    breakHistory    = [];
     lastMoveTime    = 0;
     timerStartTime  = Date.now();
     foulUntil       = 0;
@@ -228,6 +230,7 @@
       var speedR = lastPotTime > 0 ? calcSpeedBonus(nowR - lastPotTime) : 0;
       lastPotTime = nowR;
       currentBreak += 1 + speedR;
+      breakHistory.push({ name: 'RED', color: '#cc2200', base: 1, bonus: speedR });
       updateHighBreak();
       updateHUD();
       showPotMessage('RED  +' + (1 + speedR) + (speedR ? '  *' : ''), '#cc2200');
@@ -244,6 +247,7 @@
         var speedC = lastPotTime > 0 ? calcSpeedBonus(nowC - lastPotTime) : 0;
         lastPotTime = nowC;
         currentBreak += ball.value + speedC;
+        breakHistory.push({ name: ball.name.toUpperCase(), color: ball.color, base: ball.value, bonus: speedC });
         updateHighBreak();
         updateHUD();
         showPotMessage(ball.name.toUpperCase() + '  +' + (ball.value + speedC) + (speedC ? '  *' : ''), ball.color);
@@ -267,6 +271,7 @@
           var speedE = lastPotTime > 0 ? calcSpeedBonus(nowE - lastPotTime) : 0;
           lastPotTime = nowE;
           currentBreak += ball.value + speedE;
+          breakHistory.push({ name: ball.name.toUpperCase(), color: ball.color, base: ball.value, bonus: speedE });
           updateHighBreak();
           updateHUD();
           showPotMessage(ball.name.toUpperCase() + '  +' + (ball.value + speedE) + (speedE ? '  *' : ''), ball.color);
@@ -277,6 +282,7 @@
           // Wrong order — penalty, not game over
           var penalty = Math.max(4, ball.value);
           currentBreak = Math.max(0, currentBreak - penalty);
+          breakHistory.push({ name: 'FOUL', color: '#ff4136', base: -penalty, bonus: 0 });
           foulUntil = Date.now() + 500;
           showPotMessage('FOUL!  -' + penalty, '#ff4136');
           updateHUD();
@@ -632,126 +638,98 @@
     ctx.textAlign = 'left';
   }
 
-  function drawGameOver(size) {
-    ctx.fillStyle = 'rgba(10,10,10,0.88)';
+  function drawEndScreen(size, title, titleColor) {
+    ctx.fillStyle = 'rgba(5,5,5,0.94)';
     ctx.fillRect(0, 0, size, size);
-    ctx.textAlign = 'center';
 
-    // "GAME OVER"
-    var t = Math.max(11, Math.floor(size * 0.046));
-    ctx.font        = pixelFont(t);
-    ctx.fillStyle   = '#cc2200';
-    ctx.shadowColor = '#cc2200';
+    // Title
+    var tf = Math.max(10, Math.floor(size * 0.044));
+    ctx.font        = pixelFont(tf);
+    ctx.fillStyle   = titleColor;
+    ctx.shadowColor = titleColor;
     ctx.shadowBlur  = 16;
-    ctx.fillText('GAME OVER', size / 2, size * 0.30);
-    ctx.shadowBlur = 0;
+    ctx.textAlign   = 'center';
+    ctx.fillText(title, size / 2, size * 0.07 + tf);
+    ctx.shadowBlur  = 0;
 
-    // "BREAK" label
-    var bl = Math.max(5, Math.floor(size * 0.020));
-    ctx.font      = pixelFont(bl);
-    ctx.fillStyle = '#444';
-    ctx.fillText('BREAK', size / 2, size * 0.30 + t * 2.0);
+    // Break history rows
+    var rf      = Math.max(5, Math.floor(size * 0.019));
+    var rowH    = rf + Math.max(3, Math.floor(rf * 0.55));
+    var listTop = size * 0.17;
+    var listBot = size * 0.80;
+    var maxRows = Math.floor((listBot - listTop) / rowH);
 
-    // Break number
-    var sc = Math.max(10, Math.floor(size * 0.044));
-    ctx.font        = pixelFont(sc);
+    // If history is longer than fits, truncate from the top
+    var start = Math.max(0, breakHistory.length - maxRows);
+    if (start > 0) {
+      ctx.font      = pixelFont(rf);
+      ctx.fillStyle = '#444';
+      ctx.textAlign = 'center';
+      ctx.fillText('...', size / 2, listTop + rf);
+      listTop += rowH;
+      start = Math.max(0, breakHistory.length - (maxRows - 1));
+    }
+
+    var colName  = size * 0.06;
+    var colBase  = size * 0.54;
+    var colBonus = size * 0.95;
+
+    ctx.font = pixelFont(rf);
+    for (var i = start; i < breakHistory.length; i++) {
+      var e = breakHistory[i];
+      var y = listTop + (i - start) * rowH + rf;
+
+      // Ball name
+      ctx.fillStyle = e.color;
+      ctx.textAlign = 'left';
+      ctx.fillText(e.name, colName, y);
+
+      // Base value (or negative for fouls)
+      var baseStr = (e.base >= 0 ? '+' : '') + e.base;
+      ctx.fillStyle = e.base < 0 ? '#ff4136' : 'rgba(255,255,255,0.75)';
+      ctx.textAlign = 'right';
+      ctx.fillText(baseStr, colBase, y);
+
+      // Bonus
+      if (e.bonus > 0) {
+        ctx.fillStyle = '#c8a530';
+        ctx.fillText('+' + e.bonus + ' BONUS', colBonus, y);
+      }
+    }
+
+    // Divider
+    ctx.strokeStyle = '#282828';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.05, size * 0.82);
+    ctx.lineTo(size * 0.95, size * 0.82);
+    ctx.stroke();
+
+    // Total break
+    var sf = Math.max(8, Math.floor(size * 0.036));
+    ctx.font        = pixelFont(sf);
     ctx.fillStyle   = SNAKE_COLOR;
     ctx.shadowColor = SNAKE_COLOR;
-    ctx.shadowBlur  = 10;
-    ctx.fillText(String(currentBreak).padStart(3, '0'), size / 2, size * 0.30 + t * 2.0 + bl * 2.0 + sc * 0.9);
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur  = 8;
+    ctx.textAlign   = 'center';
+    ctx.fillText('BREAK  ' + String(currentBreak).padStart(3, '0'), size / 2, size * 0.89);
+    ctx.shadowBlur  = 0;
 
-    // High break line
-    var hi = Math.max(6, Math.floor(size * 0.021));
-    ctx.font      = pixelFont(hi);
-    var isNew     = currentBreak > 0 && currentBreak >= highBreak;
+    // High break
+    var hf    = Math.max(5, Math.floor(size * 0.018));
+    var isNew = currentBreak > 0 && currentBreak >= highBreak;
+    ctx.font      = pixelFont(hf);
     ctx.fillStyle = isNew ? '#ffd700' : '#444';
     ctx.fillText(
       isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
-      size / 2,
-      size * 0.30 + t * 2.0 + bl * 2.0 + sc * 0.9 + hi * 3.2
+      size / 2, size * 0.96
     );
-
     ctx.textAlign = 'left';
   }
 
-  function drawWinScreen(size) {
-    ctx.fillStyle = 'rgba(10,10,10,0.92)';
-    ctx.fillRect(0, 0, size, size);
-    ctx.textAlign = 'center';
-
-    var t = Math.max(11, Math.floor(size * 0.046));
-    ctx.font        = pixelFont(t);
-    ctx.fillStyle   = '#ffd700';
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur  = 22;
-    ctx.fillText('FRAME OVER', size / 2, size * 0.28);
-    ctx.shadowBlur  = 0;
-
-    var bl = Math.max(5, Math.floor(size * 0.020));
-    ctx.font      = pixelFont(bl);
-    ctx.fillStyle = '#444';
-    ctx.fillText('BREAK', size / 2, size * 0.28 + t * 2.0);
-
-    var sc = Math.max(10, Math.floor(size * 0.044));
-    ctx.font        = pixelFont(sc);
-    ctx.fillStyle   = SNAKE_COLOR;
-    ctx.shadowColor = SNAKE_COLOR;
-    ctx.shadowBlur  = 10;
-    ctx.fillText(String(currentBreak).padStart(3, '0'), size / 2, size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9);
-    ctx.shadowBlur  = 0;
-
-    var hi = Math.max(6, Math.floor(size * 0.021));
-    ctx.font      = pixelFont(hi);
-    var isNew     = currentBreak > 0 && currentBreak >= highBreak;
-    ctx.fillStyle = isNew ? '#ffd700' : '#444';
-    ctx.fillText(
-      isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
-      size / 2,
-      size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9 + hi * 3.2
-    );
-
-    ctx.textAlign = 'left';
-  }
-
-  function drawTimeUpScreen(size) {
-    ctx.fillStyle = 'rgba(10,10,10,0.92)';
-    ctx.fillRect(0, 0, size, size);
-    ctx.textAlign = 'center';
-
-    var t = Math.max(11, Math.floor(size * 0.046));
-    ctx.font        = pixelFont(t);
-    ctx.fillStyle   = '#ff8c00';
-    ctx.shadowColor = '#ff8c00';
-    ctx.shadowBlur  = 22;
-    ctx.fillText("TIME'S UP", size / 2, size * 0.28);
-    ctx.shadowBlur  = 0;
-
-    var bl = Math.max(5, Math.floor(size * 0.020));
-    ctx.font      = pixelFont(bl);
-    ctx.fillStyle = '#444';
-    ctx.fillText('BREAK', size / 2, size * 0.28 + t * 2.0);
-
-    var sc = Math.max(10, Math.floor(size * 0.044));
-    ctx.font        = pixelFont(sc);
-    ctx.fillStyle   = SNAKE_COLOR;
-    ctx.shadowColor = SNAKE_COLOR;
-    ctx.shadowBlur  = 10;
-    ctx.fillText(String(currentBreak).padStart(3, '0'), size / 2, size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9);
-    ctx.shadowBlur  = 0;
-
-    var hi = Math.max(6, Math.floor(size * 0.021));
-    ctx.font      = pixelFont(hi);
-    var isNew     = currentBreak > 0 && currentBreak >= highBreak;
-    ctx.fillStyle = isNew ? '#ffd700' : '#444';
-    ctx.fillText(
-      isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
-      size / 2,
-      size * 0.28 + t * 2.0 + bl * 2.0 + sc * 0.9 + hi * 3.2
-    );
-
-    ctx.textAlign = 'left';
-  }
+  function drawGameOver(size)     { drawEndScreen(size, 'GAME OVER',  '#cc2200'); }
+  function drawWinScreen(size)    { drawEndScreen(size, 'FRAME OVER', '#ffd700'); }
+  function drawTimeUpScreen(size) { drawEndScreen(size, "TIME'S UP",  '#ff8c00'); }
 
   // ============================================================
   // Keyboard input
