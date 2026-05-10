@@ -96,6 +96,7 @@
   let breakHistory = [];    // { name, color, base, bonus } per pot/foul event
   let animId, lastMoveTime, dpr, cols, cellSize;
   let frameNumber = 1;
+  let countdownUntil = 0;
   let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2, carry: 'off' };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
@@ -153,6 +154,7 @@
     timerStartTime  = Date.now();
     foulUntil       = 0;
     frameNumber     = 1;
+    countdownUntil  = 0;
     placeRed();
     updateHUD();
   }
@@ -382,6 +384,7 @@
     timerStartTime = Date.now();
     placeRed();
     updateHUD();
+    countdownUntil = Date.now() + 3000;
     gameState = 'playing';
     syncUI();
     lastMoveTime = 0;
@@ -417,7 +420,7 @@
     }
     if (ts - lastMoveTime >= SPEEDS[settings.speed]) {
       lastMoveTime = ts;
-      if (Date.now() >= foulUntil) {
+      if (Date.now() >= foulUntil && Date.now() >= countdownUntil) {
         step();
         if (gameState !== 'playing') return;
       }
@@ -449,6 +452,7 @@
     drawFrameCounter(size);
     drawSpeedBar(size);
     if (potMessage) drawPotMessage(size, ts);
+    if (countdownUntil > 0 && Date.now() < countdownUntil) drawCountdown(size);
 
     if (gameState === 'gameover') drawGameOver(size);
     if (gameState === 'win')      drawWinScreen(size);
@@ -568,6 +572,27 @@
     ctx.fillText(label, 6, s + 8);
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+  }
+
+  function drawCountdown(size) {
+    var remaining = Math.ceil((countdownUntil - Date.now()) / 1000);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, size, size);
+
+    var nf = Math.max(20, Math.floor(size * 0.20));
+    ctx.font        = pixelFont(nf);
+    ctx.fillStyle   = '#ffd700';
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur  = 28;
+    ctx.textAlign   = 'center';
+    ctx.fillText(String(remaining), size / 2, size / 2 + nf * 0.38);
+    ctx.shadowBlur  = 0;
+
+    var sf = Math.max(6, Math.floor(size * 0.022));
+    ctx.font      = pixelFont(sf);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText('FRAME ' + frameNumber, size / 2, size / 2 - nf * 0.55);
+    ctx.textAlign = 'left';
   }
 
   function drawFrameCounter(size) {
