@@ -95,7 +95,8 @@
   let lastPotTime = 0;      // Date.now() of most recent pot; 0 = none yet this game
   let breakHistory = [];    // { name, color, base, bonus } per pot/foul event
   let animId, lastMoveTime, dpr, cols, cellSize;
-  let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2 };
+  let frameNumber = 1;
+  let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2, carry: 'off' };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
 
@@ -151,6 +152,7 @@
     lastMoveTime    = 0;
     timerStartTime  = Date.now();
     foulUntil       = 0;
+    frameNumber     = 1;
     placeRed();
     updateHUD();
   }
@@ -365,6 +367,27 @@
     setTimeout(function () { actionBtn.disabled = false; }, 3000);
   }
 
+  function nextFrame() {
+    frameNumber++;
+    phase         = 'red';
+    redCount      = 0;
+    redBall       = null;
+    colourBalls   = [];
+    colourOffsets = COLOUR_DEFS.map(function () { return { dx: 0, dy: 0 }; });
+    potMessage    = null;
+    lastPotTime   = 0;
+    breakHistory  = [];
+    currentBreak  = 0;
+    foulUntil     = 0;
+    timerStartTime = Date.now();
+    placeRed();
+    updateHUD();
+    gameState = 'playing';
+    syncUI();
+    lastMoveTime = 0;
+    animId = requestAnimationFrame(gameLoop);
+  }
+
   function timeUp() {
     gameState = 'timeup';
     gameEndTime = Date.now();
@@ -378,6 +401,7 @@
 
   function syncUI() {
     var labels = { start: 'START GAME', playing: 'PLAYING...', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN', timeup: 'PLAY AGAIN' };
+    if (settings.carry === 'on' && gameState === 'win') labels.win = 'NEXT FRAME';
     actionBtn.textContent = labels[gameState] || 'START GAME';
     actionBtn.hidden = (gameState === 'playing');
     restartBtn.hidden = (gameState !== 'playing');
@@ -422,6 +446,7 @@
     drawSnake();
     drawOnIndicator(size);
     drawTimer(size, ts);
+    drawFrameCounter(size);
     drawSpeedBar(size);
     if (potMessage) drawPotMessage(size, ts);
 
@@ -543,6 +568,16 @@
     ctx.fillText(label, 6, s + 8);
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+  }
+
+  function drawFrameCounter(size) {
+    if (settings.carry !== 'on' || gameState !== 'playing') return;
+    var s = Math.max(5, Math.floor(size * 0.022));
+    var y = settings.timer > 0 ? Math.floor(s * 2.6) + 8 : s + 8;
+    ctx.font      = pixelFont(s);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fillText('F.' + frameNumber, 6, y);
   }
 
   // Depleting bar showing available speed bonus; label at shrinking tip reads 2/1/0 BONUS PTS
@@ -715,8 +750,16 @@
     ctx.fillText('BREAK  ' + String(currentBreak).padStart(3, '0'), size / 2, size * 0.89);
     ctx.shadowBlur  = 0;
 
+    // Frame counter (carry mode — only on game-over/timeup; win title already names the frame)
+    var hf = Math.max(5, Math.floor(size * 0.018));
+    if (settings.carry === 'on' && frameNumber > 1 && gameState !== 'win') {
+      ctx.font      = pixelFont(hf);
+      ctx.fillStyle = '#4a9a5a';
+      ctx.textAlign = 'center';
+      ctx.fillText('FRAMES CLEARED: ' + (frameNumber - 1), size / 2, size * 0.935);
+    }
+
     // High break
-    var hf    = Math.max(5, Math.floor(size * 0.018));
     var isNew = currentBreak > 0 && currentBreak >= highBreak;
     ctx.font      = pixelFont(hf);
     ctx.fillStyle = isNew ? '#ffd700' : '#444';
@@ -728,7 +771,10 @@
   }
 
   function drawGameOver(size)     { drawEndScreen(size, 'GAME OVER',  '#cc2200'); }
-  function drawWinScreen(size)    { drawEndScreen(size, 'FRAME OVER', '#ffd700'); }
+  function drawWinScreen(size) {
+    var title = settings.carry === 'on' ? 'F.' + frameNumber + ' CLEAR' : 'FRAME OVER';
+    drawEndScreen(size, title, '#ffd700');
+  }
   function drawTimeUpScreen(size) { drawEndScreen(size, "TIME'S UP",  '#ff8c00'); }
 
   // ============================================================
@@ -746,6 +792,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); return; }
       if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
       return;
     }
@@ -754,6 +801,8 @@
     e.preventDefault();
     if (gameState === 'playing') {
       queueDir(dir);
+    } else if (gameState === 'win' && settings.carry === 'on' && canRestart()) {
+      nextFrame(); queueDir(dir);
     } else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) {
       startGame(); queueDir(dir);
     }
@@ -779,6 +828,7 @@
     e.preventDefault();
 
     if (Math.max(adx, ady) < 20) {
+      if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); return; }
       if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
       return;
     }
@@ -787,7 +837,8 @@
       ? (dx > 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 })
       : (dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 });
 
-    if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
+    if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); queueDir(dir); }
+    else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
     else if (gameState === 'playing') queueDir(dir);
   }, { passive: false });
 
@@ -803,7 +854,8 @@
     function press() {
       var dir = DPAD_DIRS[btn.dataset.dir];
       if (!dir) return;
-      if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
+      if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); queueDir(dir); }
+      else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
       else if (gameState === 'playing') queueDir(dir);
     }
     btn.addEventListener('click', press);
@@ -814,6 +866,7 @@
   // Action & Restart buttons
   // ============================================================
   actionBtn.addEventListener('click', function () {
+    if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); return; }
     if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
   });
 
