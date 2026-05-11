@@ -202,10 +202,8 @@ ul { list-style: none; }
 }
 
 .site-header--scrolled {
-  background-color: rgba(10, 10, 10, 0.92);
+  background-color: #0d4d1a;
   border-color: var(--color-border);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   height: 52px;
 }
 
