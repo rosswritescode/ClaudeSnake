@@ -197,7 +197,7 @@
     colourBalls = getShiftedColourPositions();
     redBall = null;
     updateHUD();
-    showPotMessage('POT IN ORDER!', '#f0d000');
+    showPotMessage('POT IN ORDER!', null, '#f0d000');
   }
 
   // ============================================================
@@ -250,7 +250,7 @@
       breakHistory.push({ name: 'RED', color: '#cc2200', base: 1, bonus: speedR });
       updateHighBreak();
       updateHUD();
-      showPotMessage('RED  +' + (1 + speedR) + (speedR ? '  *' : ''), '#cc2200');
+      showPotMessage('RED  +1', speedR > 0 ? '+' + speedR + ' BONUS' : null, '#cc2200');
       phase = 'colour';
       placeColours();
       ate = true;
@@ -267,7 +267,7 @@
         breakHistory.push({ name: ball.name.toUpperCase(), color: ball.color, base: ball.value, bonus: speedC });
         updateHighBreak();
         updateHUD();
-        showPotMessage(ball.name.toUpperCase() + '  +' + (ball.value + speedC) + (speedC ? '  *' : ''), ball.color);
+        showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, speedC > 0 ? '+' + speedC + ' BONUS' : null, ball.color);
         if (redCount >= settings.reds) {
           startEndgame();
         } else {
@@ -291,7 +291,7 @@
           breakHistory.push({ name: ball.name.toUpperCase(), color: ball.color, base: ball.value, bonus: speedE });
           updateHighBreak();
           updateHUD();
-          showPotMessage(ball.name.toUpperCase() + '  +' + (ball.value + speedE) + (speedE ? '  *' : ''), ball.color);
+          showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, speedE > 0 ? '+' + speedE + ' BONUS' : null, ball.color);
           colourBalls.shift();
           if (colourBalls.length === 0) { winGame(); return; }
           ate = true;
@@ -301,7 +301,7 @@
           currentBreak = Math.max(0, currentBreak - penalty);
           breakHistory.push({ name: 'FOUL', color: '#ff4136', base: -penalty, bonus: 0 });
           foulUntil = Date.now() + 500;
-          showPotMessage('FOUL!  -' + penalty, '#ff4136');
+          showPotMessage('FOUL!  -' + penalty, null, '#ff4136');
           updateHUD();
           // ate stays false — snake doesn't grow, ball stays on table
         }
@@ -360,8 +360,8 @@
   // ============================================================
   // Pot message (brief canvas overlay text after potting)
   // ============================================================
-  function showPotMessage(text, color) {
-    potMessage = { text: text, color: color, startTs: null };
+  function showPotMessage(main, bonus, color) {
+    potMessage = { main: main, bonus: bonus, color: color, startTs: null };
   }
 
   // ============================================================
@@ -465,7 +465,7 @@
       var showShare = settings.carry === 'on' &&
         (gameState === 'gameover' || gameState === 'timeup' || gameState === 'win');
       if (showShare) {
-        shareEl.textContent = 'SCORE ' + sessionScore() + '  ·  FRAME ' + frameNumber + '  ·  BREAK ' + currentBreak;
+        shareEl.textContent = 'SCORE ' + sessionScore() + '  ·  FRAME ' + frameNumber;
         shareEl.hidden = false;
       } else {
         shareEl.hidden = true;
@@ -693,14 +693,28 @@
     alpha = Math.max(0, Math.min(1, alpha));
 
     ctx.globalAlpha = alpha;
-    ctx.textAlign   = 'center';
     var s = Math.max(8, Math.floor(size * 0.032));
-    ctx.font        = pixelFont(s);
+    ctx.font = pixelFont(s);
+
+    var mainText  = potMessage.main;
+    var bonusPart = potMessage.bonus ? '  ' + potMessage.bonus : '';
+    var mainW     = ctx.measureText(mainText).width;
+    var bonusW    = bonusPart ? ctx.measureText(bonusPart).width : 0;
+    var startX    = size / 2 - (mainW + bonusW) / 2;
+    var y         = size * 0.12;
+
+    ctx.textAlign   = 'left';
     ctx.fillStyle   = potMessage.color;
     ctx.shadowColor = potMessage.color;
     ctx.shadowBlur  = 12;
-    ctx.fillText(potMessage.text, size / 2, size * 0.12);
-    ctx.shadowBlur  = 0;
+    ctx.fillText(mainText, startX, y);
+    ctx.shadowBlur = 0;
+
+    if (bonusPart) {
+      ctx.fillStyle = '#c8a530';
+      ctx.fillText(bonusPart, startX + mainW, y);
+    }
+
     ctx.globalAlpha = 1;
     ctx.textAlign   = 'left';
   }
@@ -831,10 +845,10 @@
       ctx.fillText('SCORE  ' + String(ss).padStart(4, '0'), size / 2, size * 0.87);
       ctx.shadowBlur  = 0;
 
-      // Context: frame + this-frame break
+      // Context: frame number
       ctx.font      = pixelFont(hf);
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText('FRAME ' + frameNumber + '  ·  BREAK ' + currentBreak, size / 2, size * 0.925);
+      ctx.fillText('FRAME ' + frameNumber, size / 2, size * 0.925);
 
       // Hi score comparison
       var ssNew = ss > 0 && ss >= hiScore;
@@ -969,23 +983,6 @@
   });
 
   restartBtn.addEventListener('click', startGame);
-
-  // ============================================================
-  // Settings buttons
-  // ============================================================
-  document.querySelectorAll('.setting-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var setting = btn.dataset.setting;
-      var value   = btn.dataset.value;
-      var intSettings = { reds: 1, timer: 1, speedT1: 1, speedT2: 1 };
-      settings[setting] = intSettings[setting] ? parseInt(value, 10) : value;
-      document.querySelectorAll('.setting-btn[data-setting="' + setting + '"]').forEach(function (b) {
-        b.classList.toggle('setting-btn--active', b.dataset.value === value);
-      });
-      updateHUD();
-      if (gameState === 'start') draw(0);
-    });
-  });
 
   // ============================================================
   // Window resize — pause if playing, resize canvas, redraw
