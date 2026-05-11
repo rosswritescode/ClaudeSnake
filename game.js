@@ -251,10 +251,10 @@
       currentBreak += 1 + speedR;
       breakHistory.push({ name: 'RED', color: '#cc2200', base: 1, bonus: speedR });
       updateHighBreak();
-      updateHUD();
       showPotMessage('RED  +1', speedR > 0 ? '+' + speedR + ' BONUS' : null, '#cc2200');
       phase = 'colour';
       placeColours();
+      updateHUD();
       ate = true;
 
     } else if (phase === 'colour') {
@@ -268,7 +268,6 @@
         currentBreak += ball.value + speedC;
         breakHistory.push({ name: ball.name.toUpperCase(), color: ball.color, base: ball.value, bonus: speedC });
         updateHighBreak();
-        updateHUD();
         showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, speedC > 0 ? '+' + speedC + ' BONUS' : null, ball.color);
         if (redCount >= settings.reds) {
           startEndgame();
@@ -277,6 +276,7 @@
           phase = 'red';
           colourBalls = [];
           placeRed();
+          updateHUD();
         }
         ate = true;
       }
@@ -292,9 +292,9 @@
           currentBreak += ball.value + speedE;
           breakHistory.push({ name: ball.name.toUpperCase(), color: ball.color, base: ball.value, bonus: speedE });
           updateHighBreak();
-          updateHUD();
           showPotMessage(ball.name.toUpperCase() + '  +' + ball.value, speedE > 0 ? '+' + speedE + ' BONUS' : null, ball.color);
           colourBalls.shift();
+          updateHUD();
           if (colourBalls.length === 0) { winGame(); return; }
           ate = true;
         } else {
@@ -515,7 +515,6 @@
     if (phase === 'colour' || phase === 'endgame') drawColourBalls(ts);
 
     drawSnake();
-    drawOnIndicator(size);
     drawTimer(size, ts);
     drawSpeedBar(size);
     if (potMessage) drawPotMessage(size, ts);
@@ -589,28 +588,6 @@
         : breathe;                                      // all others: normal breathe
       drawBall(ball.x, ball.y, ball.color, alpha);
     });
-  }
-
-  // Small "ON: RED" / "ON: COLOUR" indicator in top-right of canvas
-  function drawOnIndicator(size) {
-    if (gameState !== 'playing') return;
-    ctx.textAlign = 'right';
-    var s = Math.max(5, Math.floor(size * 0.022));
-    ctx.font = pixelFont(s);
-    var label, color;
-    if (phase === 'red') {
-      label = 'ON: RED'; color = '#cc2200';
-    } else if (phase === 'endgame' && colourBalls.length > 0) {
-      label = 'ON: ' + colourBalls[0].name.toUpperCase(); color = colourBalls[0].color;
-    } else {
-      label = 'ON: COLOUR'; color = '#f0d000';
-    }
-    ctx.fillStyle   = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur  = 6;
-    ctx.fillText(label, size - 6, s + 8);
-    ctx.shadowBlur  = 0;
-    ctx.textAlign   = 'left';
   }
 
   function drawTimer(size, ts) {
@@ -787,13 +764,10 @@
     var rowH    = rf + Math.max(3, Math.floor(rf * 0.6));
     var listTop = size * 0.17;
 
-    if (settings.carry === 'on') {
-      // Frame-by-frame session overview
+    if (settings.carry === 'on' && gameState !== 'win') {
+      // Frame-by-frame session overview — only at true game end (gameover / timeup)
       var allFrames = frameHistory.slice();
-      // Add current/partial frame when the player didn't just clear it
-      if (gameState !== 'win') {
-        allFrames.push({ frame: frameNumber, breakScore: currentBreak, points: currentBreak * frameNumber, partial: true });
-      }
+      allFrames.push({ frame: frameNumber, breakScore: currentBreak, points: currentBreak * frameNumber, partial: true });
 
       ctx.font = pixelFont(rf);
       for (var fi = 0; fi < allFrames.length; fi++) {
@@ -801,22 +775,18 @@
         var fy = listTop + fi * rowH + rf;
         ctx.globalAlpha = fe.partial ? 0.45 : 1;
 
-        // Frame label
         ctx.fillStyle = '#ffd700';
         ctx.textAlign = 'left';
         ctx.fillText('F.' + fe.frame, size * 0.06, fy);
 
-        // Break score
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.textAlign = 'right';
         ctx.fillText(fe.breakScore + ' pts', size * 0.50, fy);
 
-        // Multiplier
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.textAlign = 'left';
         ctx.fillText('×' + fe.frame, size * 0.53, fy);
 
-        // Points contributed
         ctx.fillStyle = SNAKE_COLOR;
         ctx.textAlign = 'right';
         ctx.fillText(fe.points, size * 0.95, fy);
@@ -824,7 +794,7 @@
         ctx.globalAlpha = 1;
       }
     } else {
-      // Carry-off: pot-by-pot break history
+      // Pot-by-pot break history — carry-off always, carry-on between-frames win screen
       var listBot = size * 0.80;
       var maxRows = Math.floor((listBot - listTop) / rowH);
       var start   = Math.max(0, breakHistory.length - maxRows);
@@ -879,7 +849,7 @@
       ctx.fillText('SCORE  ' + String(ss).padStart(4, '0'), size / 2, size * 0.87);
       ctx.shadowBlur  = 0;
 
-      // Context: frame number
+      // Context: frame + this-frame break
       ctx.font      = pixelFont(hf);
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.fillText('FRAME ' + frameNumber, size / 2, size * 0.925);
