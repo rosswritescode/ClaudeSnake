@@ -97,20 +97,26 @@
   let animId, lastMoveTime, dpr, cols, cellSize;
   let frameNumber = 1;
   let countdownUntil = 0;
+  let showContinueHint = false;
   let totalScore = 0;
   let framesCompleted = 0;
   let hiScore = parseInt(localStorage.getItem('serpentine_hi_score') || '0', 10);
   let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2, carry: 'off' };
 
-  function canRestart() { return Date.now() - gameEndTime >= 3000; }
+  function canRestart() { return Date.now() - gameEndTime >= 1000; }
 
   // ============================================================
   // DOM refs
   // ============================================================
   const canvas     = document.getElementById('game-canvas');
   const ctx        = canvas.getContext('2d');
-  const scoreEl    = document.getElementById('score-val');
-  const hiEl       = document.getElementById('hi-val');
+  const hudALabel  = document.getElementById('hud-a-label');
+  const hudAVal    = document.getElementById('hud-a-val');
+  const hudBLabel  = document.getElementById('hud-b-label');
+  const hudBVal    = document.getElementById('hud-b-val');
+  const hudCItem   = document.getElementById('hud-c-item');
+  const hudCLabel  = document.getElementById('hud-c-label');
+  const hudCVal    = document.getElementById('hud-c-val');
   const onEl       = document.getElementById('on-val');
   const navScoreEl = document.getElementById('nav-score-val');
   const actionBtn  = document.getElementById('action-btn');
@@ -156,11 +162,12 @@
     breakHistory    = [];
     lastMoveTime    = 0;
     timerStartTime  = Date.now();
-    foulUntil       = 0;
-    frameNumber     = 1;
-    countdownUntil  = 0;
-    totalScore      = 0;
-    framesCompleted = 0;
+    foulUntil        = 0;
+    frameNumber      = 1;
+    countdownUntil   = 0;
+    showContinueHint = false;
+    totalScore       = 0;
+    framesCompleted  = 0;
     placeRed();
     updateHUD();
   }
@@ -315,23 +322,36 @@
   // HUD
   // ============================================================
   function updateHUD() {
-    scoreEl.textContent    = currentBreak;
-    hiEl.textContent       = highBreak;
+    if (settings.carry === 'on') {
+      hudALabel.textContent = 'FRAME';
+      hudAVal.textContent   = frameNumber;
+      hudBLabel.textContent = 'SCORE';
+      hudBVal.textContent   = sessionScore();
+      hudCLabel.textContent = '×' + frameNumber;
+      hudCVal.textContent   = currentBreak * frameNumber;
+      hudCItem.hidden       = false;
+    } else {
+      hudALabel.textContent = 'BREAK';
+      hudAVal.textContent   = currentBreak;
+      hudBLabel.textContent = 'BEST';
+      hudBVal.textContent   = highBreak;
+      hudCItem.hidden       = true;
+    }
     navScoreEl.textContent = currentBreak;
 
     if (onEl) {
       if (phase === 'red') {
-        onEl.textContent  = 'RED';
-        onEl.style.color  = '#cc2200';
+        onEl.textContent      = 'RED';
+        onEl.style.color      = '#cc2200';
         onEl.style.textShadow = '0 0 8px rgba(204,34,0,0.7)';
       } else if (phase === 'endgame' && colourBalls.length > 0) {
         const tgt = colourBalls[0];
-        onEl.textContent  = tgt.name.toUpperCase();
-        onEl.style.color  = tgt.color;
+        onEl.textContent      = tgt.name.toUpperCase();
+        onEl.style.color      = tgt.color;
         onEl.style.textShadow = '0 0 8px ' + tgt.color + '99';
       } else {
-        onEl.textContent  = 'COLOUR';
-        onEl.style.color  = '#f0d000';
+        onEl.textContent      = 'COLOUR';
+        onEl.style.color      = '#f0d000';
         onEl.style.textShadow = '0 0 8px rgba(240,208,0,0.7)';
       }
     }
@@ -376,10 +396,11 @@
     gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
     updateHiScore();
+    showContinueHint = false;
     syncUI();
     draw(0);
     actionBtn.disabled = true;
-    setTimeout(function () { actionBtn.disabled = false; }, 3000);
+    setTimeout(function () { actionBtn.disabled = false; showContinueHint = true; draw(0); }, 1000);
   }
 
   function winGame() {
@@ -390,10 +411,11 @@
     gameState = 'win';
     gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
+    showContinueHint = false;
     syncUI();
     draw(0);
     actionBtn.disabled = true;
-    setTimeout(function () { actionBtn.disabled = false; }, 3000);
+    setTimeout(function () { actionBtn.disabled = false; showContinueHint = true; draw(0); }, 1000);
   }
 
   function nextFrame() {
@@ -403,12 +425,13 @@
     redBall       = null;
     colourBalls   = [];
     colourOffsets = COLOUR_DEFS.map(function () { return { dx: 0, dy: 0 }; });
-    potMessage    = null;
-    lastPotTime   = 0;
-    breakHistory  = [];
-    currentBreak  = 0;
-    foulUntil     = 0;
-    timerStartTime = Date.now();
+    potMessage       = null;
+    lastPotTime      = 0;
+    breakHistory     = [];
+    currentBreak     = 0;
+    foulUntil        = 0;
+    showContinueHint = false;
+    timerStartTime   = Date.now();
     placeRed();
     updateHUD();
     countdownUntil = Date.now() + 3000;
@@ -424,10 +447,11 @@
     if (animId) { cancelAnimationFrame(animId); animId = null; }
     updateHighBreak();
     updateHiScore();
+    showContinueHint = false;
     syncUI();
     draw(0);
     actionBtn.disabled = true;
-    setTimeout(function () { actionBtn.disabled = false; }, 3000);
+    setTimeout(function () { actionBtn.disabled = false; showContinueHint = true; draw(0); }, 1000);
   }
 
   function syncUI() {
@@ -488,7 +512,6 @@
     drawSnake();
     drawOnIndicator(size);
     drawTimer(size, ts);
-    drawFrameCounter(size);
     drawSpeedBar(size);
     if (potMessage) drawPotMessage(size, ts);
     if (countdownUntil > 0 && Date.now() < countdownUntil) drawCountdown(size);
@@ -632,16 +655,6 @@
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.fillText('FRAME ' + frameNumber, size / 2, size / 2 - nf * 0.55);
     ctx.textAlign = 'left';
-  }
-
-  function drawFrameCounter(size) {
-    if (settings.carry !== 'on' || gameState !== 'playing') return;
-    var s = Math.max(5, Math.floor(size * 0.022));
-    var y = settings.timer > 0 ? Math.floor(s * 2.6) + 8 : s + 8;
-    ctx.font      = pixelFont(s);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.32)';
-    ctx.fillText('F.' + frameNumber, 6, y);
   }
 
   // Depleting bar showing available speed bonus; label at shrinking tip reads 2/1/0 BONUS PTS
@@ -844,6 +857,14 @@
         size / 2, size * 0.96);
     }
 
+    if (showContinueHint) {
+      var cf = Math.max(4, Math.floor(size * 0.015));
+      ctx.font      = pixelFont(cf);
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.textAlign = 'center';
+      ctx.fillText('TAP  /  PRESS  TO  CONTINUE', size / 2, size * 0.993);
+    }
+
     ctx.textAlign = 'left';
   }
 
@@ -961,6 +982,7 @@
       document.querySelectorAll('.setting-btn[data-setting="' + setting + '"]').forEach(function (b) {
         b.classList.toggle('setting-btn--active', b.dataset.value === value);
       });
+      updateHUD();
       if (gameState === 'start') draw(0);
     });
   });
@@ -980,7 +1002,7 @@
   // ============================================================
   // Boot
   // ============================================================
-  hiEl.textContent = highBreak;
+  hudBVal.textContent = highBreak;
   syncUI();
   updateHUD();
 
