@@ -97,6 +97,9 @@
   let animId, lastMoveTime, dpr, cols, cellSize;
   let frameNumber = 1;
   let countdownUntil = 0;
+  let totalScore = 0;
+  let framesCompleted = 0;
+  let hiScore = parseInt(localStorage.getItem('serpentine_hi_score') || '0', 10);
   let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2, carry: 'off' };
 
   function canRestart() { return Date.now() - gameEndTime >= 3000; }
@@ -112,6 +115,7 @@
   const navScoreEl = document.getElementById('nav-score-val');
   const actionBtn  = document.getElementById('action-btn');
   const restartBtn = document.getElementById('restart-btn');
+  const shareEl    = document.getElementById('share-line');
 
   // ============================================================
   // Canvas sizing
@@ -155,6 +159,8 @@
     foulUntil       = 0;
     frameNumber     = 1;
     countdownUntil  = 0;
+    totalScore      = 0;
+    framesCompleted = 0;
     placeRed();
     updateHUD();
   }
@@ -349,10 +355,27 @@
     animId = requestAnimationFrame(gameLoop);
   }
 
+  function sessionScore() {
+    // In 'win' state, totalScore already includes the just-won frame's contribution.
+    // In all other states (gameover, timeup, playing), add the current partial frame.
+    if (gameState === 'win') return totalScore;
+    return totalScore + currentBreak * frameNumber;
+  }
+
+  function updateHiScore() {
+    if (settings.carry !== 'on') return;
+    var ss = sessionScore();
+    if (ss > hiScore) {
+      hiScore = ss;
+      localStorage.setItem('serpentine_hi_score', String(hiScore));
+    }
+  }
+
   function endGame() {
     gameState = 'gameover';
     gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
+    updateHiScore();
     syncUI();
     draw(0);
     actionBtn.disabled = true;
@@ -360,6 +383,10 @@
   }
 
   function winGame() {
+    if (settings.carry === 'on') {
+      totalScore += currentBreak * frameNumber;
+      framesCompleted++;
+    }
     gameState = 'win';
     gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
@@ -396,6 +423,7 @@
     gameEndTime = Date.now();
     if (animId) { cancelAnimationFrame(animId); animId = null; }
     updateHighBreak();
+    updateHiScore();
     syncUI();
     draw(0);
     actionBtn.disabled = true;
@@ -408,6 +436,17 @@
     actionBtn.textContent = labels[gameState] || 'START GAME';
     actionBtn.hidden = (gameState === 'playing');
     restartBtn.hidden = (gameState !== 'playing');
+
+    if (shareEl) {
+      var showShare = settings.carry === 'on' &&
+        (gameState === 'gameover' || gameState === 'timeup' || gameState === 'win');
+      if (showShare) {
+        shareEl.textContent = 'SCORE ' + sessionScore() + '  ·  FRAME ' + frameNumber + '  ·  BREAK ' + currentBreak;
+        shareEl.hidden = false;
+      } else {
+        shareEl.hidden = true;
+      }
+    }
   }
 
   // ============================================================
@@ -765,33 +804,46 @@
     ctx.lineTo(size * 0.95, size * 0.82);
     ctx.stroke();
 
-    // Total break
     var sf = Math.max(8, Math.floor(size * 0.036));
-    ctx.font        = pixelFont(sf);
-    ctx.fillStyle   = SNAKE_COLOR;
-    ctx.shadowColor = SNAKE_COLOR;
-    ctx.shadowBlur  = 8;
-    ctx.textAlign   = 'center';
-    ctx.fillText('BREAK  ' + String(currentBreak).padStart(3, '0'), size / 2, size * 0.89);
-    ctx.shadowBlur  = 0;
-
-    // Frame counter (carry mode — only on game-over/timeup; win title already names the frame)
     var hf = Math.max(5, Math.floor(size * 0.018));
-    if (settings.carry === 'on' && frameNumber > 1 && gameState !== 'win') {
+    ctx.textAlign = 'center';
+
+    if (settings.carry === 'on') {
+      // SCORE — main metric
+      var ss = sessionScore();
+      ctx.font        = pixelFont(sf);
+      ctx.fillStyle   = SNAKE_COLOR;
+      ctx.shadowColor = SNAKE_COLOR;
+      ctx.shadowBlur  = 8;
+      ctx.fillText('SCORE  ' + String(ss).padStart(4, '0'), size / 2, size * 0.87);
+      ctx.shadowBlur  = 0;
+
+      // Context: frame + this-frame break
       ctx.font      = pixelFont(hf);
-      ctx.fillStyle = '#4a9a5a';
-      ctx.textAlign = 'center';
-      ctx.fillText('FRAMES CLEARED: ' + (frameNumber - 1), size / 2, size * 0.935);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText('FRAME ' + frameNumber + '  ·  BREAK ' + currentBreak, size / 2, size * 0.925);
+
+      // Hi score comparison
+      var ssNew = ss > 0 && ss >= hiScore;
+      ctx.fillStyle = ssNew ? '#ffd700' : '#444';
+      ctx.fillText(ssNew ? '// NEW HIGH SCORE!' : '// BEST: ' + String(hiScore).padStart(4, '0'),
+        size / 2, size * 0.965);
+    } else {
+      // Carry OFF — original layout
+      ctx.font        = pixelFont(sf);
+      ctx.fillStyle   = SNAKE_COLOR;
+      ctx.shadowColor = SNAKE_COLOR;
+      ctx.shadowBlur  = 8;
+      ctx.fillText('BREAK  ' + String(currentBreak).padStart(3, '0'), size / 2, size * 0.89);
+      ctx.shadowBlur  = 0;
+
+      var isNew = currentBreak > 0 && currentBreak >= highBreak;
+      ctx.font      = pixelFont(hf);
+      ctx.fillStyle = isNew ? '#ffd700' : '#444';
+      ctx.fillText(isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
+        size / 2, size * 0.96);
     }
 
-    // High break
-    var isNew = currentBreak > 0 && currentBreak >= highBreak;
-    ctx.font      = pixelFont(hf);
-    ctx.fillStyle = isNew ? '#ffd700' : '#444';
-    ctx.fillText(
-      isNew ? '// NEW HIGH BREAK!' : '// BEST: ' + String(highBreak).padStart(3, '0'),
-      size / 2, size * 0.96
-    );
     ctx.textAlign = 'left';
   }
 
