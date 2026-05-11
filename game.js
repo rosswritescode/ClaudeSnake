@@ -100,7 +100,9 @@
   let showContinueHint = false;
   let totalScore = 0;
   let framesCompleted = 0;
-  let hiScore = parseInt(localStorage.getItem('serpentine_hi_score') || '0', 10);
+  let frameHistory = [];  // [{ frame, breakScore, points }] one entry per completed frame
+  let hiScore  = parseInt(localStorage.getItem('serpentine_hi_score')  || '0', 10);
+  let hiFrames = parseInt(localStorage.getItem('serpentine_hi_frames') || '0', 10);
   let settings = { size: 'small', speed: 'slow', reds: 3, timer: 0, walls: 'wrap', speedT1: 1, speedT2: 2, carry: 'on' };
 
   function canRestart() { return Date.now() - gameEndTime >= 1000; }
@@ -167,6 +169,7 @@
     showContinueHint = false;
     totalScore       = 0;
     framesCompleted  = 0;
+    frameHistory     = [];
     placeRed();
     updateHUD();
   }
@@ -326,8 +329,8 @@
       hudAVal.textContent   = frameNumber;
       hudBLabel.textContent = 'SCORE';
       hudBVal.textContent   = sessionScore();
-      hudCLabel.textContent = '×' + frameNumber;
-      hudCVal.textContent   = currentBreak * frameNumber;
+      hudCLabel.textContent = hiFrames > 0 ? 'BEST · ' + hiFrames + 'F' : 'BEST';
+      hudCVal.textContent   = hiScore;
       hudCItem.hidden       = false;
     } else {
       hudALabel.textContent = 'BREAK';
@@ -386,8 +389,10 @@
     if (settings.carry !== 'on') return;
     var ss = sessionScore();
     if (ss > hiScore) {
-      hiScore = ss;
-      localStorage.setItem('serpentine_hi_score', String(hiScore));
+      hiScore  = ss;
+      hiFrames = frameNumber;
+      localStorage.setItem('serpentine_hi_score',  String(hiScore));
+      localStorage.setItem('serpentine_hi_frames', String(hiFrames));
     }
   }
 
@@ -405,6 +410,7 @@
 
   function winGame() {
     if (settings.carry === 'on') {
+      frameHistory.push({ frame: frameNumber, breakScore: currentBreak, points: currentBreak * frameNumber });
       totalScore += currentBreak * frameNumber;
       framesCompleted++;
     }
@@ -777,48 +783,77 @@
     ctx.fillText(title, size / 2, size * 0.07 + tf);
     ctx.shadowBlur  = 0;
 
-    // Break history rows
     var rf      = Math.max(5, Math.floor(size * 0.019));
-    var rowH    = rf + Math.max(3, Math.floor(rf * 0.55));
+    var rowH    = rf + Math.max(3, Math.floor(rf * 0.6));
     var listTop = size * 0.17;
-    var listBot = size * 0.80;
-    var maxRows = Math.floor((listBot - listTop) / rowH);
 
-    // If history is longer than fits, truncate from the top
-    var start = Math.max(0, breakHistory.length - maxRows);
-    if (start > 0) {
-      ctx.font      = pixelFont(rf);
-      ctx.fillStyle = '#444';
-      ctx.textAlign = 'center';
-      ctx.fillText('...', size / 2, listTop + rf);
-      listTop += rowH;
-      start = Math.max(0, breakHistory.length - (maxRows - 1));
-    }
+    if (settings.carry === 'on') {
+      // Frame-by-frame session overview
+      var allFrames = frameHistory.slice();
+      // Add current/partial frame when the player didn't just clear it
+      if (gameState !== 'win') {
+        allFrames.push({ frame: frameNumber, breakScore: currentBreak, points: currentBreak * frameNumber, partial: true });
+      }
 
-    var colName  = size * 0.06;
-    var colBase  = size * 0.54;
-    var colBonus = size * 0.95;
+      ctx.font = pixelFont(rf);
+      for (var fi = 0; fi < allFrames.length; fi++) {
+        var fe = allFrames[fi];
+        var fy = listTop + fi * rowH + rf;
+        ctx.globalAlpha = fe.partial ? 0.45 : 1;
 
-    ctx.font = pixelFont(rf);
-    for (var i = start; i < breakHistory.length; i++) {
-      var e = breakHistory[i];
-      var y = listTop + (i - start) * rowH + rf;
+        // Frame label
+        ctx.fillStyle = '#ffd700';
+        ctx.textAlign = 'left';
+        ctx.fillText('F.' + fe.frame, size * 0.06, fy);
 
-      // Ball name — black ball gets white text so it's visible on the dark overlay
-      ctx.fillStyle = e.color === '#111111' ? '#ffffff' : e.color;
-      ctx.textAlign = 'left';
-      ctx.fillText(e.name, colName, y);
+        // Break score
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.textAlign = 'right';
+        ctx.fillText(fe.breakScore + ' pts', size * 0.50, fy);
 
-      // Base value (or negative for fouls)
-      var baseStr = (e.base >= 0 ? '+' : '') + e.base;
-      ctx.fillStyle = e.base < 0 ? '#ff4136' : 'rgba(255,255,255,0.75)';
-      ctx.textAlign = 'right';
-      ctx.fillText(baseStr, colBase, y);
+        // Multiplier
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.textAlign = 'left';
+        ctx.fillText('×' + fe.frame, size * 0.53, fy);
 
-      // Bonus
-      if (e.bonus > 0) {
-        ctx.fillStyle = '#c8a530';
-        ctx.fillText('+' + e.bonus + ' BONUS', colBonus, y);
+        // Points contributed
+        ctx.fillStyle = SNAKE_COLOR;
+        ctx.textAlign = 'right';
+        ctx.fillText(fe.points, size * 0.95, fy);
+
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      // Carry-off: pot-by-pot break history
+      var listBot = size * 0.80;
+      var maxRows = Math.floor((listBot - listTop) / rowH);
+      var start   = Math.max(0, breakHistory.length - maxRows);
+      if (start > 0) {
+        ctx.font      = pixelFont(rf);
+        ctx.fillStyle = '#444';
+        ctx.textAlign = 'center';
+        ctx.fillText('...', size / 2, listTop + rf);
+        listTop += rowH;
+        start = Math.max(0, breakHistory.length - (maxRows - 1));
+      }
+      ctx.font = pixelFont(rf);
+      for (var i = start; i < breakHistory.length; i++) {
+        var e = breakHistory[i];
+        var y = listTop + (i - start) * rowH + rf;
+
+        ctx.fillStyle = e.color === '#111111' ? '#ffffff' : e.color;
+        ctx.textAlign = 'left';
+        ctx.fillText(e.name, size * 0.06, y);
+
+        var baseStr = (e.base >= 0 ? '+' : '') + e.base;
+        ctx.fillStyle = e.base < 0 ? '#ff4136' : 'rgba(255,255,255,0.75)';
+        ctx.textAlign = 'right';
+        ctx.fillText(baseStr, size * 0.54, y);
+
+        if (e.bonus > 0) {
+          ctx.fillStyle = '#c8a530';
+          ctx.fillText('+' + e.bonus + ' BONUS', size * 0.95, y);
+        }
       }
     }
 
