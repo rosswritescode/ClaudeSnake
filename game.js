@@ -339,7 +339,7 @@
       hudBVal.textContent   = highBreak;
       hudCItem.hidden       = true;
     }
-    navScoreEl.textContent = currentBreak;
+    if (navScoreEl) navScoreEl.textContent = currentBreak;
 
     if (onEl) {
       if (phase === 'red') {
@@ -839,8 +839,41 @@
     var hf = Math.max(5, Math.floor(size * 0.018));
     ctx.textAlign = 'center';
 
-    if (settings.carry === 'on') {
-      // SCORE — main metric
+    if (settings.carry === 'on' && gameState === 'win') {
+      // Between-frames: break / multiplier / frame score breakdown
+      var frameScore = currentBreak * frameNumber;
+      ctx.font = pixelFont(hf);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.textAlign = 'left';
+      ctx.fillText('TOTAL', size * 0.06, size * 0.856);
+      ctx.textAlign = 'right';
+      ctx.fillText(currentBreak, size * 0.95, size * 0.856);
+
+      ctx.fillStyle = '#c8a530';
+      ctx.textAlign = 'left';
+      ctx.fillText('FRAME MULTIPLIER', size * 0.06, size * 0.895);
+      ctx.textAlign = 'right';
+      ctx.fillText('×' + frameNumber, size * 0.95, size * 0.895);
+
+      ctx.font        = pixelFont(sf);
+      ctx.fillStyle   = SNAKE_COLOR;
+      ctx.shadowColor = SNAKE_COLOR;
+      ctx.shadowBlur  = 8;
+      ctx.textAlign   = 'left';
+      ctx.fillText('FRAME SCORE', size * 0.06, size * 0.937);
+      ctx.textAlign   = 'right';
+      ctx.fillText(frameScore, size * 0.95, size * 0.937);
+      ctx.shadowBlur  = 0;
+
+      var ssNew = totalScore > 0 && totalScore >= hiScore;
+      ctx.font      = pixelFont(hf);
+      ctx.fillStyle = ssNew ? '#ffd700' : '#444';
+      ctx.textAlign = 'center';
+      ctx.fillText(ssNew ? '// NEW HIGH SCORE!' : '// BEST: ' + String(hiScore).padStart(4, '0'),
+        size / 2, size * 0.972);
+    } else if (settings.carry === 'on') {
+      // Game over / time up: cumulative session score
       var ss = sessionScore();
       ctx.font        = pixelFont(sf);
       ctx.fillStyle   = SNAKE_COLOR;
@@ -849,15 +882,13 @@
       ctx.fillText('SCORE  ' + String(ss).padStart(4, '0'), size / 2, size * 0.87);
       ctx.shadowBlur  = 0;
 
-      // Context: frame + this-frame break
       ctx.font      = pixelFont(hf);
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.fillText('FRAME ' + frameNumber, size / 2, size * 0.925);
 
-      // Hi score comparison
-      var ssNew = ss > 0 && ss >= hiScore;
-      ctx.fillStyle = ssNew ? '#ffd700' : '#444';
-      ctx.fillText(ssNew ? '// NEW HIGH SCORE!' : '// BEST: ' + String(hiScore).padStart(4, '0'),
+      var ssNew2 = ss > 0 && ss >= hiScore;
+      ctx.fillStyle = ssNew2 ? '#ffd700' : '#444';
+      ctx.fillText(ssNew2 ? '// NEW HIGH SCORE!' : '// BEST: ' + String(hiScore).padStart(4, '0'),
         size / 2, size * 0.965);
     } else {
       // Carry OFF — original layout
@@ -888,7 +919,7 @@
 
   function drawGameOver(size)     { drawEndScreen(size, 'GAME OVER',  '#cc2200'); }
   function drawWinScreen(size) {
-    var title = settings.carry === 'on' ? 'F.' + frameNumber + ' CLEAR' : 'FRAME OVER';
+    var title = settings.carry === 'on' ? 'FRAME ' + frameNumber + ' CLEAR' : 'FRAME OVER';
     drawEndScreen(size, title, '#ffd700');
   }
   function drawTimeUpScreen(size) { drawEndScreen(size, "TIME'S UP",  '#ff8c00'); }
