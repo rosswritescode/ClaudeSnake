@@ -1,4 +1,18 @@
 /* ============================================================
+   Share line — shown below canvas on carry-mode end screens
+   ============================================================ */
+.share-line {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.38);
+  text-align: center;
+  letter-spacing: 0.1em;
+  margin: 0.35rem 0 0;
+  cursor: text;
+  user-select: all;
+}
+
+/* ============================================================
    Game Page Layout
    ============================================================ */
 .game-main {
