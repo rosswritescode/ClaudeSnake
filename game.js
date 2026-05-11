@@ -120,7 +120,6 @@
   const onEl       = document.getElementById('on-val');
   const navScoreEl = document.getElementById('nav-score-val');
   const actionBtn  = document.getElementById('action-btn');
-  const restartBtn = document.getElementById('restart-btn');
   const shareEl    = document.getElementById('share-line');
 
   // ============================================================
@@ -372,6 +371,7 @@
     initGame();
     gameState = 'playing';
     syncUI();
+    actionBtn.disabled = false;
     animId = requestAnimationFrame(gameLoop);
   }
 
@@ -455,11 +455,10 @@
   }
 
   function syncUI() {
-    var labels = { start: 'START GAME', playing: 'PLAYING...', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN', timeup: 'PLAY AGAIN' };
+    var labels = { start: 'START GAME', playing: 'RESTART', gameover: 'PLAY AGAIN', win: 'PLAY AGAIN', timeup: 'PLAY AGAIN' };
     if (settings.carry === 'on' && gameState === 'win') labels.win = 'NEXT FRAME';
     actionBtn.textContent = labels[gameState] || 'START GAME';
-    actionBtn.hidden = (gameState === 'playing');
-    restartBtn.hidden = (gameState !== 'playing');
+    actionBtn.hidden = false;
 
     if (shareEl) {
       var showShare = settings.carry === 'on' &&
@@ -729,7 +728,7 @@
     ctx.fillStyle   = SNAKE_COLOR;
     ctx.shadowColor = SNAKE_COLOR;
     ctx.shadowBlur  = 22;
-    ctx.fillText('MAX SNAKE', size / 2, size * 0.38);
+    ctx.fillText('SnookerSnake', size / 2, size * 0.38);
     ctx.shadowBlur = 0;
 
     var s = Math.max(6, Math.floor(size * 0.022));
@@ -805,8 +804,8 @@
       var e = breakHistory[i];
       var y = listTop + (i - start) * rowH + rf;
 
-      // Ball name
-      ctx.fillStyle = e.color;
+      // Ball name — black ball gets white text so it's visible on the dark overlay
+      ctx.fillStyle = e.color === '#111111' ? '#ffffff' : e.color;
       ctx.textAlign = 'left';
       ctx.fillText(e.name, colName, y);
 
@@ -955,34 +954,13 @@
   }, { passive: false });
 
   // ============================================================
-  // D-pad input
-  // ============================================================
-  var DPAD_DIRS = {
-    up: { dx: 0, dy: -1 }, down:  { dx: 0, dy: 1 },
-    left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
-  };
-
-  document.querySelectorAll('.dpad-btn').forEach(function (btn) {
-    function press() {
-      var dir = DPAD_DIRS[btn.dataset.dir];
-      if (!dir) return;
-      if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); queueDir(dir); }
-      else if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) { startGame(); queueDir(dir); }
-      else if (gameState === 'playing') queueDir(dir);
-    }
-    btn.addEventListener('click', press);
-    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
-  });
-
-  // ============================================================
-  // Action & Restart buttons
+  // Action button
   // ============================================================
   actionBtn.addEventListener('click', function () {
+    if (gameState === 'playing') { startGame(); return; }
     if (gameState === 'win' && settings.carry === 'on' && canRestart()) { nextFrame(); return; }
     if ((gameState === 'start' || gameState === 'gameover' || gameState === 'win' || gameState === 'timeup') && canRestart()) startGame();
   });
-
-  restartBtn.addEventListener('click', startGame);
 
   // ============================================================
   // Window resize — pause if playing, resize canvas, redraw
