@@ -101,7 +101,7 @@
   let totalScore = 0;
   let framesCompleted = 0;
   let hiScore = parseInt(localStorage.getItem('serpentine_hi_score') || '0', 10);
-  let settings = { size: 'small', speed: 'normal', reds: 5, timer: 0, walls: 'wrap', speedT1: 2, speedT2: 2, carry: 'off' };
+  let settings = { size: 'small', speed: 'slow', reds: 3, timer: 0, walls: 'wrap', speedT1: 1, speedT2: 2, carry: 'on' };
 
   function canRestart() { return Date.now() - gameEndTime >= 1000; }
 
