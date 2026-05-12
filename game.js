@@ -221,7 +221,14 @@
   // Movement step
   // ============================================================
   function step() {
-    if (nextDir) { currentDir = nextDir; nextDir = null; }
+    if (nextDir) {
+      // Guard against 180° reversal that can sneak in when two keys are pressed
+      // between steps (queueDir checks against nextDir, not currentDir).
+      if (!(nextDir.dx === -currentDir.dx && nextDir.dy === -currentDir.dy)) {
+        currentDir = nextDir;
+      }
+      nextDir = null;
+    }
 
     let nx = snake[0].x + currentDir.dx;
     let ny = snake[0].y + currentDir.dy;
