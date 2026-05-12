@@ -224,6 +224,14 @@ ul { list-style: none; }
   letter-spacing: 0.1em;
   text-shadow: var(--glow-snake);
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.snake-icon {
+  flex-shrink: 0;
+  display: block;
 }
 
 .logo-bracket {

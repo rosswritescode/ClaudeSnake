@@ -36,10 +36,10 @@
 }
 
 /* ============================================================
-   Nav — Teletext blue override for game page
+   Nav — green to match the table
    ============================================================ */
 .game-page .site-header--scrolled {
-  background-color: #001a6e;
+  background-color: #0d4d1a;
   border-bottom-color: #c8a530;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
